@@ -27,11 +27,11 @@ DB_CONFIG = {
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
 GROQ_API_KEY   = os.environ.get('GROQ_API_KEY', '').strip()
 AI_PROVIDER    = os.environ.get('AI_PROVIDER', 'auto').strip().lower()
-# Use env var overrides if set, otherwise these verified-working defaults
+# Verified working model names (Nov 2026)
 GEMINI_MODELS  = [m.strip() for m in os.environ.get(
-    'GEMINI_MODELS', 'gemini-1.5-flash,gemini-1.5-flash-8b,gemini-1.5-pro').split(',') if m.strip()]
+    'GEMINI_MODELS', 'gemini-pro,gemini-1.5-flash,gemini-1.5-pro').split(',') if m.strip()]
 GROQ_MODELS    = [m.strip() for m in os.environ.get(
-    'GROQ_MODELS', 'llama3-70b-8192,llama3-8b-8192,mixtral-8x7b-32768').split(',') if m.strip()]
+    'GROQ_MODELS', 'llama-3.1-70b-versatile,llama-3.1-8b-instant,gemma2-9b-it').split(',') if m.strip()]
 
 
 def _connect(url=None):

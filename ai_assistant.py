@@ -115,29 +115,33 @@ def validate_sql(sql):
 #  2. LLM PROVIDERS  (Gemini primary, Groq backup)
 # ──────────────────────────────────────────────────────────────
 def _gemini(model, system, messages):
-    # Use ?key= param (works more reliably than header on some proxies)
-    url = (f'https://generativelanguage.googleapis.com/v1beta/models/'
-           f'{model}:generateContent?key={config.GEMINI_API_KEY}')
-    body = {
-        'systemInstruction': {'parts': [{'text': system}]},
-        'contents': [{'role': 'model' if m['role'] == 'assistant' else 'user',
-                      'parts': [{'text': m['content']}]} for m in messages],
-        'generationConfig': {'temperature': 0.1, 'maxOutputTokens': 800},
-    }
-    r = requests.post(url, json=body, timeout=HTTP_TIMEOUT,
-                      headers={'Content-Type': 'application/json'})
-    if r.status_code != 200:
-        try:
-            err_msg = r.json().get('error', {}).get('message', r.text[:200])
-        except Exception:
-            err_msg = r.text[:200]
-        raise _HttpError(r.status_code, err_msg)
-    data = r.json()
-    parts = (data.get('candidates') or [{}])[0].get('content', {}).get('parts', [])
-    text = ''.join(p.get('text', '') for p in parts if not p.get('thought'))
-    if not text.strip():
-        raise _HttpError(502, 'empty response')
-    return text
+    # Try v1 first, fall back to v1beta
+    for api_ver in ('v1', 'v1beta'):
+        url = (f'https://generativelanguage.googleapis.com/{api_ver}/models/'
+               f'{model}:generateContent?key={config.GEMINI_API_KEY}')
+        body = {
+            'contents': [
+                {'role': 'user',
+                 'parts': [{'text': f'[System context]\n{system}\n\n[User question]\n{messages[-1]["content"]}'}]}
+            ],
+            'generationConfig': {'temperature': 0.1, 'maxOutputTokens': 800},
+        }
+        r = requests.post(url, json=body, timeout=HTTP_TIMEOUT,
+                          headers={'Content-Type': 'application/json'})
+        if r.status_code == 200:
+            data  = r.json()
+            parts = (data.get('candidates') or [{}])[0].get('content', {}).get('parts', [])
+            text  = ''.join(p.get('text', '') for p in parts if not p.get('thought'))
+            if text.strip():
+                return text
+        elif r.status_code != 404:
+            # 404 = try next api version; anything else = real error
+            try: err_msg = r.json().get('error', {}).get('message', r.text[:200])
+            except: err_msg = r.text[:200]
+            raise _HttpError(r.status_code, err_msg)
+    try: err_msg = r.json().get('error', {}).get('message', r.text[:200])
+    except: err_msg = r.text[:200]
+    raise _HttpError(404, err_msg)
     data = r.json()
     parts = (data.get('candidates') or [{}])[0].get('content', {}).get('parts', [])
     text = ''.join(p.get('text', '') for p in parts if not p.get('thought'))
