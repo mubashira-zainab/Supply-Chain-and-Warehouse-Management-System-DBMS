@@ -1,0 +1,110 @@
+{% extends 'base.html' %}
+{% block title %}Inventory{% endblock %}
+{% block page_title %}Inventory Management{% endblock %}
+{% block content %}
+
+<div class="page-actions">
+  <h2 style="font-size:14px;color:var(--color-text-muted);font-weight:500">{{ stock|length }} stock record(s)</h2>
+  <button class="btn btn-primary" onclick="openModal('addModal')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Add / Update Stock
+  </button>
+</div>
+
+<div class="card">
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Warehouse</th><th>Product</th><th>Category</th><th>Quantity</th><th>Status</th></tr>
+      </thead>
+      <tbody>
+        {% for s in stock %}
+        <tr>
+          <td class="td-muted">{{ s.location }}</td>
+          <td class="fw-600">{{ s.product_name }}</td>
+          <td><span class="badge badge-secondary">{{ s.category or '—' }}</span></td>
+          <td>
+            {% if s.quantity == 0 %}
+              <span class="stock-low fw-600">0</span>
+            {% elif s.quantity < 10 %}
+              <span class="stock-low fw-600">{{ s.quantity }}</span>
+            {% elif s.quantity < 30 %}
+              <span class="stock-medium fw-600">{{ s.quantity }}</span>
+            {% else %}
+              <span class="stock-high fw-600">{{ s.quantity }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if s.quantity == 0 %}
+              <span class="badge badge-danger">Out of Stock</span>
+            {% elif s.quantity < 10 %}
+              <span class="badge badge-danger">Low Stock</span>
+            {% elif s.quantity < 30 %}
+              <span class="badge badge-warning">Medium</span>
+            {% else %}
+              <span class="badge badge-success">In Stock</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="5">No stock records found.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add / Update Stock
+      </span>
+      <button class="modal-close" onclick="closeModal('addModal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('add_stock') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-body">
+        <p class="form-hint" style="margin-bottom:14px">If this product already exists in the selected warehouse, the quantity will be added to existing stock.</p>
+        <div class="form-group">
+          <label class="form-label">Product *</label>
+          <select name="product_id" class="form-select" required>
+            <option value="">-- Select Product --</option>
+            {% for p in products %}
+            <option value="{{ p.product_id }}">{{ p.product_name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Warehouse *</label>
+          <select name="warehouse_id" class="form-select" required>
+            <option value="">-- Select Warehouse --</option>
+            {% for w in warehouses %}
+            <option value="{{ w.warehouse_id }}">{{ w.location }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Quantity to Add *</label>
+          <input type="number" name="quantity" class="form-input" min="1" required placeholder="e.g. 50">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Stock</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(function(el){
+  el.addEventListener('click', function(e){ if(e.target===el) el.classList.remove('open'); });
+});
+</script>
+{% endblock %}

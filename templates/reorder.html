@@ -1,0 +1,32 @@
+{% extends 'base.html' %}
+{% block title %}Reorder Alerts{% endblock %}
+{% block page_title %}Reorder Alerts{% endblock %}
+{% block content %}
+<div style="background:#fef2f2;border-left:3px solid #dc2626;border-radius:8px;padding:12px 16px;font-size:13px;color:#991b1b;margin-bottom:20px">
+  <strong>Inventory Intelligence Alert:</strong> The following products are at or below their defined reorder point. Immediate replenishment action is required to avoid stockout.
+</div>
+<div class="card">
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Product</th><th>Category</th><th>Warehouse</th><th>Current Stock</th><th>Reorder Point</th><th>Safety Stock</th><th>Units Needed</th></tr>
+      </thead>
+      <tbody>
+        {% for a in alerts %}
+        <tr>
+          <td class="fw-600">{{ a.product_name }}</td>
+          <td><span class="badge badge-secondary">{{ a.category or '—' }}</span></td>
+          <td class="td-muted">{{ a.warehouse }}</td>
+          <td><span class="badge badge-danger">{{ a.current_stock }}</span></td>
+          <td>{{ a.reorder_point }}</td>
+          <td>{{ a.safety_stock }}</td>
+          <td><span class="badge badge-warning">{{ a.units_needed }}</span></td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="7">No reorder alerts — all inventory levels are above reorder points.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

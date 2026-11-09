@@ -1,0 +1,41 @@
+{% extends 'base.html' %}
+{% block title %}AI Assistant{% endblock %}
+{% block page_title %}AI Assistant{% endblock %}
+{% block content %}
+
+{% if not ai.configured %}
+<div class="notice notice-warn">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+  <span>The AI assistant is not configured yet. Add <code>GEMINI_API_KEY</code> and/or <code>GROQ_API_KEY</code>
+  to the <code>.env</code> file (or to Vercel → Environment Variables) and restart the app.</span>
+</div>
+{% endif %}
+
+<div class="card chat-shell" style="border:none;box-shadow:none;background:transparent">
+  <div class="chips">
+    <span class="td-muted small" style="align-self:center">Try:</span>
+    <button class="chip" data-q="Which products are low on stock and in which warehouse?">Low stock items</button>
+    <button class="chip" data-q="Show total stock per warehouse">Stock per warehouse</button>
+    <button class="chip" data-q="Which shipments are currently in transit and where are they now?">Shipments in transit</button>
+    <button class="chip" data-q="Top 5 customers by total order value">Top customers</button>
+    <button class="chip" data-q="Which products need reordering and how many units?">Reorder needs</button>
+    <button class="chip" data-q="Pending orders ki list dikhao">Pending orders (Roman Urdu)</button>
+  </div>
+  <div class="chat-log" id="chat-log">
+    <div class="msg msg-bot"><div class="bubble">
+      <p>Assalam-o-Alaikum! I'm your supply-chain data assistant. Ask me about stock, orders, suppliers or shipments in
+      English, Urdu or Roman Urdu — for example “Which warehouse has the most Corn Oil?”.
+      I can only <b>read</b> data; I never change it.</p>
+    </div></div>
+  </div>
+  <form class="chat-bar" id="chat-form" autocomplete="off">
+    <input id="chat-input" class="form-input" maxlength="500" placeholder="Ask a question about your supply chain…" required>
+    <button id="chat-send" class="btn btn-primary" type="submit">Send</button>
+  </form>
+</div>
+<p class="td-muted small" style="margin-top:10px">
+  🔒 Read-only database access · queries are validated before they run · phone numbers, e-mails and addresses are never sent to the AI.
+</p>
+
+<script src="{{ url_for('static', filename='js/assistant.js') }}"></script>
+{% endblock %}

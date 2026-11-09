@@ -1,0 +1,93 @@
+{% extends 'base.html' %}
+{% block title %}Customers{% endblock %}
+{% block page_title %}Customers{% endblock %}
+{% block content %}
+
+<div class="page-actions">
+  <h2 style="font-size:14px;color:var(--color-text-muted);font-weight:500">{{ customers|length }} customer(s) registered</h2>
+  <button class="btn btn-primary" onclick="openModal('addModal')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Add Customer
+  </button>
+</div>
+
+<div class="card">
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Name</th><th>Phone</th><th>Email</th><th>Address</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        {% for c in customers %}
+        <tr>
+          <td class="td-muted">{{ c.customer_id }}</td>
+          <td class="fw-600">{{ c.name }}</td>
+          <td class="td-muted">{{ c.phone or '—' }}</td>
+          <td class="td-muted">{{ c.email or '—' }}</td>
+          <td class="td-muted">{{ c.address or '—' }}</td>
+          <td>
+            <a href="{{ url_for('delete_customer', cid=c.customer_id) }}"
+               class="btn btn-ghost-danger btn-sm"
+               onclick="return confirm('Delete customer: {{ c.name }}?')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+              </svg>
+              Delete
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="6">No customers registered yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Customer
+      </span>
+      <button class="modal-close" onclick="closeModal('addModal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('add_customer') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Full Name *</label>
+          <input type="text" name="name" class="form-input" required placeholder="e.g. Ali Hassan">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Phone</label>
+          <input type="text" name="phone" class="form-input" placeholder="e.g. 0300-1234567">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Email</label>
+          <input type="email" name="email" class="form-input" placeholder="customer@example.com">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Address</label>
+          <input type="text" name="address" class="form-input" placeholder="City, Area">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Customer</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(function(el){
+  el.addEventListener('click', function(e){ if(e.target===el) el.classList.remove('open'); });
+});
+</script>
+{% endblock %}

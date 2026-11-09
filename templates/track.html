@@ -1,0 +1,82 @@
+{% extends 'base.html' %}
+{% block title %}Track {{ t.tracking_no }}{% endblock %}
+{% block page_title %}Live Tracking — {{ t.tracking_no }}{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
+{% block content %}
+
+<div class="card" style="margin-bottom:20px">
+  <div class="card-body track-head">
+    <div><div class="k">Tracking No</div><div class="v">{{ t.tracking_no }}</div></div>
+    <div><div class="k">Carrier</div><div class="v">{{ t.carrier }}</div></div>
+    <div><div class="k">Order</div><div class="v">#{{ t.order_id }}</div></div>
+    <div><div class="k">Product</div><div class="v">{{ t.product }} × {{ t.qty }}</div></div>
+    <div><div class="k">Customer</div><div class="v">{{ t.customer }}</div></div>
+    <div><div class="k">Shipped</div><div class="v">{{ t.shipped }}</div></div>
+    <div style="margin-left:auto"><div class="k">Status</div><div class="v" id="t-status"></div></div>
+  </div>
+</div>
+
+<div class="track-grid">
+  <div class="card">
+    <div class="card-body"><div id="track-map" class="map-box"></div></div>
+  </div>
+
+  <div style="display:grid;gap:20px">
+    <div class="card"><div class="card-body">
+      <div style="display:flex;justify-content:space-between;font-weight:600;margin-bottom:8px">
+        <span>{{ t.origin_name or 'Origin' }} → {{ t.address }}</span><span id="t-progress-label">0%</span>
+      </div>
+      <div class="progress"><div id="t-progress-bar"></div></div>
+      <div class="kpi-row">
+        <div class="kpi"><div class="k">Distance</div><div class="v" id="t-distance">—</div></div>
+        <div class="kpi"><div class="k">Remaining</div><div class="v" id="t-remaining">—</div></div>
+        <div class="kpi"><div class="k">Est. delivery</div><div class="v" id="t-eta">—</div></div>
+      </div>
+      <p class="td-muted small" style="margin-top:10px">Live: this page refreshes automatically every 15 seconds while the shipment is in transit.</p>
+    </div></div>
+
+    <div class="card">
+      <div class="card-header">Tracking History</div>
+      <div class="card-body"><ul class="timeline" id="t-timeline"></ul></div>
+    </div>
+  </div>
+</div>
+
+{% if session.get('role') in ('Admin', 'Manager') and t.status == 'In Transit' %}
+<div class="card" style="margin-top:20px">
+  <div class="card-header">Carrier Actions</div>
+  <div class="card-body action-grid">
+    <form method="POST" action="{{ url_for('simulate_checkpoint', sid=t.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <button class="btn btn-primary" type="submit">▶ Move to next checkpoint (demo)</button>
+      <span class="td-muted small">Advances along the route: hubs → out for delivery → delivered.</span>
+    </form>
+    <form method="POST" action="{{ url_for('add_checkpoint', sid=t.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <select name="city" class="form-select" style="width:170px" required>
+        <option value="">Checkpoint city…</option>
+        {% for c in cities %}<option>{{ c }}</option>{% endfor %}
+      </select>
+      <select name="event_type" class="form-select" style="width:160px">
+        <option>In Transit</option><option>Out for Delivery</option><option>Delayed</option>
+      </select>
+      <input name="note" class="form-input" style="width:220px" placeholder="Note (optional)" maxlength="200">
+      <button class="btn btn-outline" type="submit">Add checkpoint</button>
+    </form>
+    <form method="POST" action="{{ url_for('update_shipment', sid=t.id) }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <select name="status" class="form-select" style="width:150px">
+        <option>In Transit</option><option>Delivered</option><option>Returned</option>
+      </select>
+      <button class="btn btn-outline" type="submit">Update status</button>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='js/tracking.js') }}"></script>
+<script>SCWMS.initTrack('track-map', {{ t|tojson }}, {{ url_for('api_tracking', sid=t.id)|tojson }});</script>
+{% endblock %}

@@ -1,0 +1,295 @@
+{% extends 'base.html' %}
+{% block title %}Reports & SQL Queries{% endblock %}
+{% block page_title %}Reports & SQL Query Portfolio{% endblock %}
+{% block content %}
+
+<div class="tabs" id="tabBar">
+  <button class="tab-btn active" onclick="switchTab('selection',this)">Selection</button>
+  <button class="tab-btn" onclick="switchTab('projection',this)">Projection</button>
+  <button class="tab-btn" onclick="switchTab('join',this)">Join</button>
+  <button class="tab-btn" onclick="switchTab('aggregation',this)">Aggregation</button>
+  <button class="tab-btn" onclick="switchTab('having',this)">HAVING</button>
+  <button class="tab-btn" onclick="switchTab('subquery',this)">Subquery</button>
+  <button class="tab-btn" onclick="switchTab('division',this)">Division</button>
+  <button class="tab-btn" onclick="switchTab('views',this)">Views</button>
+  <button class="tab-btn" onclick="switchTab('function',this)">Function</button>
+  <button class="tab-btn" onclick="switchTab('supplier',this)">Supplier View</button>
+  <button class="tab-btn" onclick="switchTab('orders_view',this)">Order Summary</button>
+</div>
+
+<!-- SELECTION -->
+<div class="tab-panel active" id="tab-selection">
+  <div class="query-box">
+    <div class="query-label">Relational Algebra — Selection (sigma)</div>
+    <code>sigma_Price&gt;1000 (Product)
+
+SQL:
+SELECT * FROM Product WHERE Price &gt; 1000 ORDER BY Price DESC</code>
+  </div>
+  <div class="card"><div class="table-wrapper"><table>
+    <thead><tr><th>ID</th><th>Product Name</th><th>Category</th><th>Price (Rs.)</th></tr></thead>
+    <tbody>
+      {% for p in selection %}<tr>
+        <td class="td-muted">{{ p.product_id }}</td>
+        <td class="fw-600">{{ p.product_name }}</td>
+        <td><span class="badge badge-secondary">{{ p.category }}</span></td>
+        <td class="fw-600">Rs. {{ "{:,.0f}".format(p.price) }}</td>
+      </tr>{% else %}<tr class="empty-row"><td colspan="4">No results.</td></tr>{% endfor %}
+    </tbody>
+  </table></div></div>
+</div>
+
+<!-- PROJECTION -->
+<div class="tab-panel" id="tab-projection">
+  <div class="query-box">
+    <div class="query-label">Relational Algebra — Projection (pi)</div>
+    <code>pi_Product_Name, Category, Price (Product)
+
+SQL:
+SELECT Product_Name, Category, Price FROM Product ORDER BY Price DESC</code>
+  </div>
+  <div class="card"><div class="table-wrapper"><table>
+    <thead><tr><th>Product Name</th><th>Category</th><th>Price (Rs.)</th></tr></thead>
+    <tbody>
+      {% for p in projection %}<tr>
+        <td class="fw-600">{{ p.product_name }}</td>
+        <td><span class="badge badge-secondary">{{ p.category or '—' }}</span></td>
+        <td>Rs. {{ "{:,.0f}".format(p.price) }}</td>
+      </tr>{% else %}<tr class="empty-row"><td colspan="3">No results.</td></tr>{% endfor %}
+    </tbody>
+  </table></div></div>
+</div>
+
+<!-- JOIN -->
+<div class="tab-panel" id="tab-join">
+  <div class="query-box">
+    <div class="query-label">Relational Algebra — Natural Join (bowtie)</div>
+    <code>Product BOWTIE_{Supplier_ID} Supplier
+
+SQL:
+SELECT p.*, s.Name AS Supplier_Name, s.Contact
+FROM Product p JOIN Supplier s ON p.Supplier_ID = s.Supplier_ID</code>
+  </div>
+  <div class="card"><div class="table-wrapper"><table>
+    <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Supplier</th><th>Contact</th></tr></thead>
+    <tbody>
+      {% for p in join %}<tr>
+        <td class="fw-600">{{ p.product_name }}</td>
+        <td><span class="badge badge-secondary">{{ p.category or '—' }}</span></td>
+        <td>Rs. {{ "{:,.0f}".format(p.price) }}</td>
+        <td>{{ p.supplier_name }}</td>
+        <td class="td-muted">{{ p.supplier_contact }}</td>
+      </tr>{% else %}<tr class="empty-row"><td colspan="5">No results.</td></tr>{% endfor %}
+    </tbody>
+  </table></div></div>
+</div>
+
+<!-- AGGREGATION -->
+<div class="tab-panel" id="tab-aggregation">
+  <div class="query-box">
+    <div class="query-label">Relational Algebra — Aggregation (gamma)</div>
+    <code>gamma_{Category; COUNT(*), AVG(Price)} (Product)
+
+SQL:
+SELECT Category, COUNT(*) AS Total, ROUND(AVG(Price),2) AS Avg_Price
+FROM Product GROUP BY Category ORDER BY Avg_Price DESC</code>
+  </div>
+  <div class="card"><div class="table-wrapper"><table>
+    <thead><tr><th>Category</th><th>Total Products</th><th>Average Price (Rs.)</th></tr></thead>
+    <tbody>
+      {% for r in aggregation %}<tr>
+        <td class="fw-600">{{ r.category or '—' }}</td>
+        <td>{{ r.total }}</td>
+        <td>Rs. {{ r.avg_price }}</td>
+      </tr>{% else %}<tr class="empty-row"><td colspan="3">No results.</td></tr>{% endfor %}
+    </tbody>
+  </table></div></div>
+</div>
+
+<!-- HAVING -->
+<div class="tab-panel" id="tab-having">
+  <div class="query-box">
+    <div class="query-label">SQL — GROUP BY with HAVING clause</div>
+    <code>SELECT w.Location, SUM(s.Quantity) AS Total_Stock
+FROM   Stock s JOIN Warehouse w ON s.Warehouse_ID = w.Warehouse_ID
+GROUP  BY w.Location
+HAVING SUM(s.Quantity) &gt; 50
+ORDER  BY Total_Stock DESC</code>
+  </div>
+  <div class="card"><div class="table-wrapper"><table>
+    <thead><tr><th>Warehouse</th><th>Total Stock (units)</th></tr></thead>
+    <tbody>
+      {% for r in having %}<tr>
+        <td class="fw-600">{{ r.location }}</td>
+        <td class="fw-600">{{ r.total_stock }}</td>
+      </tr>{% else %}<tr class="empty-row"><td colspan="2">No results.</td></tr>{% endfor %}
+    </tbody>
+  </table></div></div>
+</div>
+
+<!-- SUBQUERY -->
+<div class="tab-panel" id="tab-subquery">
+  <div class="query-box">
+    <div class="query-label">SQL — Subquery (Products never ordered)</div>
+    <code>SELECT Product_Name, Category, Price FROM Product
+WHERE  Product_ID NOT IN (
+    SELECT DISTINCT Product_ID FROM Orders
+)</code>
+  </div>
+  <div class="card"><div class="table-wrapper"><table>
+    <thead><tr><th>Product Name</th><th>Category</th><th>Price (Rs.)</th></tr></thead>
+    <tbody>
+      {% for p in subquery %}<tr>
+        <td class="fw-600">{{ p.product_name }}</td>
+        <td><span class="badge badge-secondary">{{ p.category or '—' }}</span></td>
+        <td>Rs. {{ "{:,.0f}".format(p.price) }}</td>
+      </tr>{% else %}<tr class="empty-row"><td colspan="3">All products have been ordered.</td></tr>{% endfor %}
+    </tbody>
+  </table></div></div>
+</div>
+
+<!-- DIVISION -->
+<div class="tab-panel" id="tab-division">
+  <div class="query-box">
+    <div class="query-label">Relational Algebra — Division (warehouses stocking ALL products from Supplier 1)</div>
+    <code>SELECT DISTINCT w.Warehouse_ID, w.Location
+FROM   Stock s JOIN Warehouse w ON s.Warehouse_ID = w.Warehouse_ID
+WHERE  NOT EXISTS (
+    SELECT p.Product_ID FROM Product p WHERE p.Supplier_ID = 1
+    AND NOT EXISTS (
+        SELECT 1 FROM Stock s2
+        WHERE  s2.Warehouse_ID = s.Warehouse_ID
+        AND    s2.Product_ID   = p.Product_ID
+    )
+)</code>
+  </div>
+  <div class="card"><div class="table-wrapper"><table>
+    <thead><tr><th>Warehouse ID</th><th>Location</th></tr></thead>
+    <tbody>
+      {% for r in division %}<tr>
+        <td class="td-muted">{{ r.warehouse_id }}</td>
+        <td class="fw-600">{{ r.location }}</td>
+      </tr>{% else %}<tr class="empty-row"><td colspan="2">No warehouse stocks all Supplier 1 products.</td></tr>{% endfor %}
+    </tbody>
+  </table></div></div>
+</div>
+
+<!-- VIEWS -->
+<div class="tab-panel" id="tab-views">
+  <div class="query-box">
+    <div class="query-label">SQL View — Low_Stock_Alert (Quantity &lt; 10)</div>
+    <code>CREATE VIEW Low_Stock_Alert AS
+    SELECT p.Product_Name, p.Category, w.Location AS Warehouse, s.Quantity
+    FROM   Stock s JOIN Product p ON s.Product_ID=p.Product_ID
+           JOIN Warehouse w ON s.Warehouse_ID=w.Warehouse_ID
+    WHERE  s.Quantity &lt; 10
+
+SELECT * FROM Low_Stock_Alert;</code>
+  </div>
+  <div class="card"><div class="table-wrapper"><table>
+    <thead><tr><th>Product</th><th>Category</th><th>Warehouse</th><th>Quantity</th></tr></thead>
+    <tbody>
+      {% for s in low_stock %}<tr>
+        <td class="fw-600">{{ s.product_name }}</td>
+        <td><span class="badge badge-secondary">{{ s.category or '—' }}</span></td>
+        <td class="td-muted">{{ s.warehouse }}</td>
+        <td><span class="badge badge-danger">{{ s.quantity }}</span></td>
+      </tr>{% else %}<tr class="empty-row"><td colspan="4">All stock levels are healthy.</td></tr>{% endfor %}
+    </tbody>
+  </table></div></div>
+</div>
+
+<!-- STORED FUNCTION -->
+<div class="tab-panel" id="tab-function">
+  <div class="query-box">
+    <div class="query-label">Stored Function — get_stock(product_id, warehouse_id)</div>
+    <code>CREATE OR REPLACE FUNCTION get_stock(p_product_id INT, p_warehouse_id INT)
+RETURNS INT LANGUAGE plpgsql AS $$
+DECLARE v_qty INT;
+BEGIN
+    SELECT Quantity INTO v_qty FROM Stock
+    WHERE Product_ID=p_product_id AND Warehouse_ID=p_warehouse_id;
+    IF NOT FOUND THEN RETURN 0; END IF;
+    RETURN v_qty;
+END; $$;
+
+-- Usage:
+SELECT p.Product_Name, w.Location, get_stock(s.Product_ID, s.Warehouse_ID) AS Current_Stock
+FROM Stock s JOIN Product p ... JOIN Warehouse w ...</code>
+  </div>
+  <div class="card"><div class="table-wrapper"><table>
+    <thead><tr><th>Product</th><th>Location</th><th>Stock (via function)</th></tr></thead>
+    <tbody>
+      {% for r in function_demo %}<tr>
+        <td class="fw-600">{{ r.product_name }}</td>
+        <td class="td-muted">{{ r.location }}</td>
+        <td>
+          {% if r.current_stock < 10 %}<span class="badge badge-danger">{{ r.current_stock }}</span>
+          {% elif r.current_stock < 30 %}<span class="badge badge-warning">{{ r.current_stock }}</span>
+          {% else %}<span class="badge badge-success">{{ r.current_stock }}</span>{% endif %}
+        </td>
+      </tr>{% else %}<tr class="empty-row"><td colspan="3">No data.</td></tr>{% endfor %}
+    </tbody>
+  </table></div></div>
+</div>
+
+<!-- SUPPLIER PERFORMANCE VIEW -->
+<div class="tab-panel" id="tab-supplier">
+  <div class="query-box">
+    <div class="query-label">SQL View — Supplier_Product_Summary</div>
+    <code>SELECT s.Name, COUNT(p.Product_ID) AS Total_Products,
+       ROUND(AVG(p.Price),2) AS Avg_Product_Price,
+       SUM(COALESCE(st.Quantity,0)) AS Total_Stock
+FROM Supplier s LEFT JOIN Product p ON p.Supplier_ID=s.Supplier_ID
+     LEFT JOIN Stock st ON st.Product_ID=p.Product_ID
+GROUP BY s.Supplier_ID, s.Name, s.Contact</code>
+  </div>
+  <div class="card"><div class="table-wrapper"><table>
+    <thead><tr><th>Supplier</th><th>Products</th><th>Avg Price</th><th>Total Stock</th></tr></thead>
+    <tbody>
+      {% for r in supplier_perf %}<tr>
+        <td class="fw-600">{{ r.supplier_name }}</td>
+        <td>{{ r.total_products }}</td>
+        <td>Rs. {{ r.avg_product_price or 0 }}</td>
+        <td>{{ r.total_stock }}</td>
+      </tr>{% else %}<tr class="empty-row"><td colspan="4">No data.</td></tr>{% endfor %}
+    </tbody>
+  </table></div></div>
+</div>
+
+<!-- ORDER SUMMARY VIEW -->
+<div class="tab-panel" id="tab-orders_view">
+  <div class="query-box">
+    <div class="query-label">SQL View — Order_Summary</div>
+    <code>SELECT o.Order_ID, c.Name AS Customer_Name, p.Product_Name,
+       su.Name AS Supplier_Name, o.Quantity, o.Order_Date, o.Status
+FROM Orders o
+JOIN Customer c ON o.Customer_ID=c.Customer_ID
+JOIN Product  p ON o.Product_ID=p.Product_ID
+LEFT JOIN Supplier su ON p.Supplier_ID=su.Supplier_ID</code>
+  </div>
+  <div class="card"><div class="table-wrapper"><table>
+    <thead><tr><th>#</th><th>Customer</th><th>Product</th><th>Supplier</th><th>Qty</th><th>Date</th><th>Status</th></tr></thead>
+    <tbody>
+      {% for o in order_summary %}<tr>
+        <td class="td-muted">{{ o.order_id }}</td>
+        <td class="fw-600">{{ o.customer_name }}</td>
+        <td>{{ o.product_name }}</td>
+        <td class="td-muted">{{ o.supplier_name }}</td>
+        <td>{{ o.quantity }}</td>
+        <td class="td-muted">{{ o.order_date }}</td>
+        <td><span class="badge badge-{{ o.status|lower }}">{{ o.status }}</span></td>
+      </tr>{% else %}<tr class="empty-row"><td colspan="7">No orders.</td></tr>{% endfor %}
+    </tbody>
+  </table></div></div>
+</div>
+
+<script>
+function switchTab(name, btn) {
+  document.querySelectorAll('.tab-panel').forEach(function(p){ p.classList.remove('active'); });
+  document.querySelectorAll('.tab-btn').forEach(function(b){ b.classList.remove('active'); });
+  document.getElementById('tab-'+name).classList.add('active');
+  btn.classList.add('active');
+}
+</script>
+{% endblock %}

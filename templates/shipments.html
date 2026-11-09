@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% block title %}Shipments{% endblock %}
+{% block page_title %}Shipment Tracking{% endblock %}
+{% block head %}
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+{% endblock %}
+{% block content %}
+
+<div class="card" style="margin-bottom:20px">
+  <div class="card-header">Live Shipment Map
+    <span class="td-muted" style="margin-left:auto;font-weight:400">🏭 warehouse &nbsp; 🚚 in transit &nbsp; 📍 destination &nbsp; ✅ delivered</span>
+  </div>
+  <div class="card-body"><div id="ship-map" class="map-box"></div></div>
+</div>
+
+<div class="card" style="margin-bottom:20px">
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>Tracking No</th><th>Order</th><th>Customer</th><th>Product</th><th>Qty</th>
+            <th>Route</th><th>Last Scan</th><th>Status</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for s in shipments %}
+        <tr>
+          <td class="fw-600">{{ s.tracking_no }}</td>
+          <td class="td-muted">#{{ s.order_id }}</td>
+          <td>{{ s.customer_name }}</td>
+          <td>{{ s.product_name }}</td>
+          <td>{{ s.quantity }}</td>
+          <td class="td-muted">{{ s.origin_warehouse or '—' }} → {{ s.customer_address or '—' }}</td>
+          <td class="td-muted">{{ s.last_location or '—' }}<br>
+              <span class="small">{{ s.last_event_time.strftime('%d %b, %H:%M') if s.last_event_time else '' }}</span></td>
+          <td>
+            {% if s.shipment_status == 'Delivered' %}<span class="badge badge-delivered">Delivered</span>
+            {% elif s.shipment_status == 'Returned' %}<span class="badge badge-returned">Returned</span>
+            {% else %}<span class="badge badge-transit">In Transit</span>{% endif %}
+          </td>
+          <td>
+            <a href="{{ url_for('track_shipment', sid=s.shipment_id) }}" class="btn btn-primary btn-sm">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/></svg>
+              Track
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="9">No shipments yet. Update an order status to "Shipped" to auto-create a shipment.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<div style="background:#eff6ff;border-left:3px solid #2563eb;border-radius:8px;padding:14px 18px;font-size:13px;color:#1e40af">
+  <strong>Database triggers behind this page:</strong>
+  <code>trg_auto_shipment</code> creates the shipment when an order becomes <em>Shipped</em>;
+  <code>trg_prepare_shipment</code> assigns the tracking number and origin warehouse;
+  <code>trg_first_tracking_event</code> logs the first "Dispatched" checkpoint;
+  <code>trg_shipment_status_event</code> logs delivery/return and syncs the order status.
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{{ url_for('static', filename='js/tracking.js') }}"></script>
+<script>SCWMS.initOverview('ship-map', {{ map_data|tojson }});</script>
+{% endblock %}

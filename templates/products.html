@@ -1,0 +1,100 @@
+{% extends 'base.html' %}
+{% block title %}Products{% endblock %}
+{% block page_title %}Products{% endblock %}
+{% block content %}
+
+<div class="page-actions">
+  <h2 style="font-size:14px;color:var(--color-text-muted);font-weight:500">{{ products|length }} product(s) in catalog</h2>
+  <button class="btn btn-primary" onclick="openModal('addModal')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    Add Product
+  </button>
+</div>
+
+<div class="card">
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Product Name</th><th>Category</th><th>Price (Rs.)</th><th>Supplier</th><th>Action</th></tr>
+      </thead>
+      <tbody>
+        {% for p in products %}
+        <tr>
+          <td class="td-muted">{{ p.product_id }}</td>
+          <td class="fw-600">{{ p.product_name }}</td>
+          <td><span class="badge badge-secondary">{{ p.category or '—' }}</span></td>
+          <td class="fw-600">Rs. {{ "{:,.0f}".format(p.price) }}</td>
+          <td class="td-muted">{{ p.supplier_name }}</td>
+          <td>
+            <a href="{{ url_for('delete_product', pid=p.product_id) }}"
+               class="btn btn-ghost-danger btn-sm"
+               onclick="return confirm('Delete product: {{ p.product_name }}?')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="3 6 5 6 21 6"/>
+                <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
+              </svg>
+              Delete
+            </a>
+          </td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="6">No products added yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ADD MODAL -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Add Product
+      </span>
+      <button class="modal-close" onclick="closeModal('addModal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('add_product') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="modal-body">
+        <div class="form-group">
+          <label class="form-label">Product Name *</label>
+          <input type="text" name="product_name" class="form-input" required placeholder="e.g. Basmati Rice 5kg">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Category</label>
+          <input type="text" name="category" class="form-input" placeholder="e.g. Grains, Dairy, Beverages">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Price (Rs.) *</label>
+          <input type="number" name="price" class="form-input" step="0.01" min="0" required placeholder="0.00">
+        </div>
+        <div class="form-group">
+          <label class="form-label">Supplier *</label>
+          <select name="supplier_id" class="form-select" required>
+            <option value="">-- Select Supplier --</option>
+            {% for s in suppliers %}
+            <option value="{{ s.supplier_id }}">{{ s.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('addModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Product</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+function openModal(id){ document.getElementById(id).classList.add('open'); }
+function closeModal(id){ document.getElementById(id).classList.remove('open'); }
+document.querySelectorAll('.modal-overlay').forEach(function(el){
+  el.addEventListener('click', function(e){ if(e.target===el) el.classList.remove('open'); });
+});
+</script>
+{% endblock %}

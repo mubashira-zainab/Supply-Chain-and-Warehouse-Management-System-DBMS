@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+{% block title %}Inventory Ledger{% endblock %}
+{% block page_title %}Inventory Transaction Ledger{% endblock %}
+{% block content %}
+<div style="background:#eff6ff;border-left:3px solid #2563eb;border-radius:8px;padding:12px 16px;font-size:13px;color:#1e40af;margin-bottom:20px">
+  <strong>Audit Trail:</strong> Every inventory movement (receipts, sales, adjustments, transfers) is permanently recorded here. This implements the FMCG Inventory Ledger concept — current stock can be reconstructed by summing all transactions.
+</div>
+<div class="card">
+  <div class="table-wrapper">
+    <table>
+      <thead>
+        <tr><th>#</th><th>Product</th><th>Warehouse</th><th>Type</th><th>Qty Change</th><th>Date/Time</th><th>Reference</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        {% for t in transactions %}
+        <tr>
+          <td class="td-muted">{{ t.trans_id }}</td>
+          <td class="fw-600">{{ t.product_name }}</td>
+          <td class="td-muted">{{ t.location }}</td>
+          <td>
+            {% if t.trans_type == 'Sale' %}<span class="badge badge-cancelled">{{ t.trans_type }}</span>
+            {% elif t.trans_type == 'Receipt' %}<span class="badge badge-success">{{ t.trans_type }}</span>
+            {% elif t.trans_type == 'Adjustment' %}<span class="badge badge-processing">{{ t.trans_type }}</span>
+            {% elif t.trans_type in ['Transfer_In'] %}<span class="badge badge-delivered">{{ t.trans_type }}</span>
+            {% elif t.trans_type in ['Transfer_Out'] %}<span class="badge badge-shipped">{{ t.trans_type }}</span>
+            {% else %}<span class="badge badge-secondary">{{ t.trans_type }}</span>{% endif %}
+          </td>
+          <td class="{% if t.quantity < 0 %}text-danger fw-600{% else %}text-success fw-600{% endif %}">
+            {% if t.quantity > 0 %}+{% endif %}{{ t.quantity }}
+          </td>
+          <td class="td-muted" style="font-size:12px">{{ t.trans_date }}</td>
+          <td class="td-muted">{{ t.reference_no or '—' }}</td>
+          <td class="td-muted" style="font-size:12px">{{ t.notes or '—' }}</td>
+        </tr>
+        {% else %}
+        <tr class="empty-row"><td colspan="8">No transactions recorded yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

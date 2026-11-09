@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block auth_content %}
+<div class="login-page">
+  <div class="login-card">
+    <div class="login-logo">
+      <div class="login-logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M20 7H4a2 2 0 00-2 2v10a2 2 0 002 2h16a2 2 0 002-2V9a2 2 0 00-2-2z"/>
+          <path d="M16 21V5a2 2 0 00-2-2h-4a2 2 0 00-2 2v16"/>
+        </svg>
+      </div>
+      <span class="login-logo-title">SC &amp; WMS</span>
+      <span class="login-logo-sub">Supply Chain &amp; Warehouse Management System</span>
+      <span class="login-logo-sub" style="font-size:11px;color:#64748b;margin-top:2px">
+        Mubashira Zainab &nbsp;|&nbsp; BS Mathematics 5th Sem<br>
+        CASPAM, BZU Multan &nbsp;|&nbsp; Supervisor: Dr. Imran Javaid
+      </span>
+    </div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for category, message in messages %}
+      <div class="alert alert-{{ category }}" style="margin-bottom:20px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <span>{{ message }}</span>
+      </div>
+      {% endfor %}
+    {% endwith %}
+
+    <form method="POST" action="{{ url_for('login') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <div class="form-group">
+        <label class="form-label">Username</label>
+        <input type="text" name="username" class="form-input"
+               placeholder="Enter username" required autocomplete="username">
+      </div>
+      <div class="form-group" style="margin-bottom:24px">
+        <label class="form-label">Password</label>
+        <input type="password" name="password" class="form-input"
+               placeholder="Enter password" required autocomplete="current-password">
+      </div>
+      <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:11px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4"/>
+          <polyline points="10 17 15 12 10 7"/>
+          <line x1="15" y1="12" x2="3" y2="12"/>
+        </svg>
+        Sign In
+      </button>
+    </form>
+
+    <p style="text-align:center;margin-top:18px;font-size:12px;color:#94a3b8">
+      Default credentials: <code style="background:#f1f5f9;padding:2px 6px;border-radius:4px;color:#475569">admin / admin123</code>
+    </p>
+  </div>
+</div>
+{% endblock %}
