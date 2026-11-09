@@ -287,6 +287,21 @@ def stock():
     return render_template('stock.html', stock=rows,
                            products=products, warehouses=warehouses)
 
+@app.route('/stock/set', methods=['POST'])
+@login_required
+@role_required('Admin', 'Manager')
+def set_stock():
+    """Directly set a stock quantity (edit in-place)."""
+    try:
+        db_exec('''
+            UPDATE Stock SET Quantity=%s
+            WHERE Product_ID=%s AND Warehouse_ID=%s
+        ''', (request.form['quantity'], request.form['product_id'], request.form['warehouse_id']))
+        flash('Stock quantity updated.', 'success')
+    except Exception as e:
+        flash(f'Error: {e}', 'error')
+    return redirect(url_for('stock'))
+
 @app.route('/stock/add', methods=['POST'])
 @login_required
 @role_required('Admin', 'Manager')
@@ -618,6 +633,41 @@ def reports():
         '''),
     }
     return render_template('reports.html', **data)
+
+# ─────────────────────────────────────────────────────────────
+#  LIVE DASHBOARD API  (called by Chart.js every 30 seconds)
+# ─────────────────────────────────────────────────────────────
+@app.route('/api/dashboard/live')
+def api_dashboard_live():
+    if 'user' not in session:
+        return jsonify(ok=False), 401
+    stats = {
+        'suppliers':  db_fetch('SELECT COUNT(*) AS c FROM Supplier')[0]['c'],
+        'products':   db_fetch('SELECT COUNT(*) AS c FROM Product')[0]['c'],
+        'orders':     db_fetch('SELECT COUNT(*) AS c FROM Orders')[0]['c'],
+        'shipments':  db_fetch('SELECT COUNT(*) AS c FROM Shipment')[0]['c'],
+        'low_stock':  db_fetch('SELECT COUNT(*) AS c FROM Low_Stock_Alert')[0]['c'],
+        'pending':    db_fetch("SELECT COUNT(*) AS c FROM Orders WHERE Status='Pending'")[0]['c'],
+        'in_transit': db_fetch("SELECT COUNT(*) AS c FROM Shipment WHERE Status='In Transit'")[0]['c'],
+    }
+    # order status distribution
+    status = db_fetch('SELECT Status, COUNT(*) AS cnt FROM Orders GROUP BY Status')
+    # revenue by category
+    cat = db_fetch('''
+        SELECT p.Category, COALESCE(SUM(o.Quantity*p.Price),0) AS revenue
+        FROM Orders o JOIN Product p ON o.Product_ID=p.Product_ID
+        GROUP BY p.Category ORDER BY revenue DESC
+    ''')
+    # warehouse stock
+    wh = db_fetch('''
+        SELECT w.Location, COALESCE(SUM(s.Quantity),0) AS qty
+        FROM Warehouse w LEFT JOIN Stock s ON s.Warehouse_ID=w.Warehouse_ID
+        GROUP BY w.Location ORDER BY qty DESC
+    ''')
+    return jsonify(ok=True, stats=stats,
+                   status=[{'s': r['status'], 'c': r['cnt']} for r in status],
+                   cat=[{'l': r['category'], 'v': float(r['revenue'])} for r in cat],
+                   wh=[{'l': r['location'], 'v': int(r['qty'])} for r in wh])
 
 # ─────────────────────────────────────────────────────────────
 #  BUSINESS INTELLIGENCE DASHBOARD

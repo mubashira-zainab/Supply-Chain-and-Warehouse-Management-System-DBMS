@@ -4,22 +4,31 @@
 {% block content %}
 
 <div class="page-actions">
-  <h2 style="font-size:14px;color:var(--color-text-muted);font-weight:500">{{ stock|length }} stock record(s)</h2>
-  <button class="btn btn-primary" onclick="openModal('addModal')">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-    Add / Update Stock
-  </button>
+  <h2 style="font-size:14px;color:var(--color-text-muted);font-weight:500">
+    {{ stock|length }} stock record(s)
+  </h2>
+  <div style="display:flex;gap:10px">
+    <input type="text" id="stockSearch" class="form-input" placeholder="Search product or warehouse…"
+           style="width:220px" oninput="filterStock()">
+    <button class="btn btn-primary" onclick="openModal('addModal')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Add Stock
+    </button>
+  </div>
 </div>
 
 <div class="card">
   <div class="table-wrapper">
-    <table>
+    <table id="stockTable">
       <thead>
-        <tr><th>Warehouse</th><th>Product</th><th>Category</th><th>Quantity</th><th>Status</th></tr>
+        <tr>
+          <th>Warehouse</th><th>Product</th><th>Category</th>
+          <th>Quantity</th><th>Status</th><th>Action</th>
+        </tr>
       </thead>
       <tbody>
         {% for s in stock %}
-        <tr>
+        <tr data-search="{{ s.location|lower }} {{ s.product_name|lower }}">
           <td class="td-muted">{{ s.location }}</td>
           <td class="fw-600">{{ s.product_name }}</td>
           <td><span class="badge badge-secondary">{{ s.category or '—' }}</span></td>
@@ -45,15 +54,26 @@
               <span class="badge badge-success">In Stock</span>
             {% endif %}
           </td>
+          <td>
+            <button class="btn btn-outline btn-sm"
+              onclick="openEdit('{{ s.product_id }}','{{ s.warehouse_id }}','{{ s.product_name }}','{{ s.location }}','{{ s.quantity }}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+              </svg>
+              Edit
+            </button>
+          </td>
         </tr>
         {% else %}
-        <tr class="empty-row"><td colspan="5">No stock records found.</td></tr>
+        <tr class="empty-row"><td colspan="6">No stock records found.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
+<!-- ADD MODAL -->
 <div class="modal-overlay" id="addModal">
   <div class="modal">
     <div class="modal-header">
@@ -68,11 +88,13 @@
     <form method="POST" action="{{ url_for('add_stock') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
-        <p class="form-hint" style="margin-bottom:14px">If this product already exists in the selected warehouse, the quantity will be added to existing stock.</p>
+        <p class="form-hint" style="margin-bottom:14px">
+          If this product already exists in the selected warehouse, the quantity will be <strong>added</strong> to existing stock.
+        </p>
         <div class="form-group">
           <label class="form-label">Product *</label>
           <select name="product_id" class="form-select" required>
-            <option value="">-- Select Product --</option>
+            <option value="">— Select Product —</option>
             {% for p in products %}
             <option value="{{ p.product_id }}">{{ p.product_name }}</option>
             {% endfor %}
@@ -81,7 +103,7 @@
         <div class="form-group">
           <label class="form-label">Warehouse *</label>
           <select name="warehouse_id" class="form-select" required>
-            <option value="">-- Select Warehouse --</option>
+            <option value="">— Select Warehouse —</option>
             {% for w in warehouses %}
             <option value="{{ w.warehouse_id }}">{{ w.location }}</option>
             {% endfor %}
@@ -100,11 +122,62 @@
   </div>
 </div>
 
+<!-- EDIT MODAL -->
+<div class="modal-overlay" id="editModal">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
+          <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+        </svg>
+        Edit Stock Quantity
+      </span>
+      <button class="modal-close" onclick="closeModal('editModal')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <form method="POST" action="{{ url_for('set_stock') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="product_id"   id="edit_pid">
+    <input type="hidden" name="warehouse_id" id="edit_wid">
+      <div class="modal-body">
+        <p id="edit_label" style="font-size:14px;font-weight:600;margin-bottom:14px;color:var(--color-text)"></p>
+        <div class="form-group">
+          <label class="form-label">New Quantity (overwrites current)</label>
+          <input type="number" name="quantity" id="edit_qty" class="form-input" min="0" required>
+          <p class="form-hint">Current: <strong id="edit_current"></strong> units</p>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline" onclick="closeModal('editModal')">Cancel</button>
+        <button type="submit" class="btn btn-primary">Update Quantity</button>
+      </div>
+    </form>
+  </div>
+</div>
+
 <script>
 function openModal(id){ document.getElementById(id).classList.add('open'); }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
 document.querySelectorAll('.modal-overlay').forEach(function(el){
   el.addEventListener('click', function(e){ if(e.target===el) el.classList.remove('open'); });
 });
+
+function openEdit(pid, wid, product, warehouse, qty){
+  document.getElementById('edit_pid').value  = pid;
+  document.getElementById('edit_wid').value  = wid;
+  document.getElementById('edit_qty').value  = qty;
+  document.getElementById('edit_current').textContent = qty;
+  document.getElementById('edit_label').textContent   = product + ' — ' + warehouse;
+  openModal('editModal');
+}
+
+function filterStock(){
+  var q = document.getElementById('stockSearch').value.toLowerCase();
+  document.querySelectorAll('#stockTable tbody tr[data-search]').forEach(function(row){
+    row.style.display = row.dataset.search.includes(q) ? '' : 'none';
+  });
+}
 </script>
 {% endblock %}
