@@ -125,7 +125,11 @@ def _gemini(model, system, messages):
     r = requests.post(url, json=body, timeout=HTTP_TIMEOUT,
                       headers={'x-goog-api-key': config.GEMINI_API_KEY, 'Content-Type': 'application/json'})
     if r.status_code != 200:
-        raise _HttpError(r.status_code, r.text)
+        try:
+            err_msg = r.json().get('error', {}).get('message', r.text)
+        except Exception:
+            err_msg = r.text
+        raise _HttpError(r.status_code, err_msg)
     data = r.json()
     parts = (data.get('candidates') or [{}])[0].get('content', {}).get('parts', [])
     text = ''.join(p.get('text', '') for p in parts if not p.get('thought'))

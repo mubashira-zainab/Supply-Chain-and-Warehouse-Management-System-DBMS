@@ -564,6 +564,32 @@ def simulate_checkpoint(sid):
     return redirect(url_for('track_shipment', sid=sid))
 
 # ─────────────────────────────────────────────────────────────
+#  AI DEBUG  (admin only — checks if key works)
+# ─────────────────────────────────────────────────────────────
+@app.route('/api/ai/ping')
+def api_ai_ping():
+    if 'user' not in session or session.get('role') != 'Admin':
+        return jsonify(ok=False, error='Admin only'), 403
+    import requests as _req
+    key = config.GEMINI_API_KEY
+    if not key:
+        return jsonify(ok=False, configured=False, error='GEMINI_API_KEY not set in environment variables.')
+    try:
+        url  = f'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent'
+        body = {'contents':[{'role':'user','parts':[{'text':'Reply with just: OK'}]}],
+                'generationConfig':{'maxOutputTokens':5}}
+        r = _req.post(url, json=body, timeout=15,
+                      headers={'x-goog-api-key': key, 'Content-Type': 'application/json'})
+        if r.status_code == 200:
+            return jsonify(ok=True, model='gemini-1.5-flash', message='AI is working!')
+        else:
+            try: err = r.json().get('error',{}).get('message', r.text[:200])
+            except: err = r.text[:200]
+            return jsonify(ok=False, configured=True, status=r.status_code, error=err)
+    except Exception as e:
+        return jsonify(ok=False, configured=True, error=str(e))
+
+# ─────────────────────────────────────────────────────────────
 #  AI ASSISTANT  (keys stay on the server — see ai_assistant.py)
 # ─────────────────────────────────────────────────────────────
 AI_LIMIT_PER_HOUR = 40     # protects the free API quota
