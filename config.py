@@ -27,6 +27,7 @@ DB_CONFIG = {
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
 GROQ_API_KEY   = os.environ.get('GROQ_API_KEY', '').strip()
 AI_PROVIDER    = os.environ.get('AI_PROVIDER', 'auto').strip().lower()
+# Use env var overrides if set, otherwise these verified-working defaults
 GEMINI_MODELS  = [m.strip() for m in os.environ.get(
     'GEMINI_MODELS', 'gemini-1.5-flash,gemini-1.5-flash-8b,gemini-1.5-pro').split(',') if m.strip()]
 GROQ_MODELS    = [m.strip() for m in os.environ.get(

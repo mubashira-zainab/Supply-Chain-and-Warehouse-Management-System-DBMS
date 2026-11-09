@@ -16,10 +16,10 @@ import requests
 
 import config
 
-MAX_ROWS        = 100          # rows returned to the UI
-SUMMARY_ROWS    = 20           # rows sent to the LLM for the explanation
-STATEMENT_MS    = 5000         # DB statement timeout
-HTTP_TIMEOUT    = 25           # seconds per LLM call
+MAX_ROWS        = 50           # rows returned to the UI
+SUMMARY_ROWS    = 10           # rows sent to the LLM for the explanation
+STATEMENT_MS    = 4000         # DB statement timeout
+HTTP_TIMEOUT    = 8            # seconds per LLM call (Vercel hobby = 10s max)
 # columns that hold personal data are never sent to the LLM
 PII_COLUMNS = {'phone', 'email', 'contact', 'address', 'customer_address',
                'supplier_email', 'supplier_contact', 'password'}
@@ -115,21 +115,29 @@ def validate_sql(sql):
 #  2. LLM PROVIDERS  (Gemini primary, Groq backup)
 # ──────────────────────────────────────────────────────────────
 def _gemini(model, system, messages):
-    url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'
+    # Use ?key= param (works more reliably than header on some proxies)
+    url = (f'https://generativelanguage.googleapis.com/v1beta/models/'
+           f'{model}:generateContent?key={config.GEMINI_API_KEY}')
     body = {
         'systemInstruction': {'parts': [{'text': system}]},
         'contents': [{'role': 'model' if m['role'] == 'assistant' else 'user',
                       'parts': [{'text': m['content']}]} for m in messages],
-        'generationConfig': {'temperature': 0.1, 'maxOutputTokens': 1024},
+        'generationConfig': {'temperature': 0.1, 'maxOutputTokens': 800},
     }
     r = requests.post(url, json=body, timeout=HTTP_TIMEOUT,
-                      headers={'x-goog-api-key': config.GEMINI_API_KEY, 'Content-Type': 'application/json'})
+                      headers={'Content-Type': 'application/json'})
     if r.status_code != 200:
         try:
-            err_msg = r.json().get('error', {}).get('message', r.text)
+            err_msg = r.json().get('error', {}).get('message', r.text[:200])
         except Exception:
-            err_msg = r.text
+            err_msg = r.text[:200]
         raise _HttpError(r.status_code, err_msg)
+    data = r.json()
+    parts = (data.get('candidates') or [{}])[0].get('content', {}).get('parts', [])
+    text = ''.join(p.get('text', '') for p in parts if not p.get('thought'))
+    if not text.strip():
+        raise _HttpError(502, 'empty response')
+    return text
     data = r.json()
     parts = (data.get('candidates') or [{}])[0].get('content', {}).get('parts', [])
     text = ''.join(p.get('text', '') for p in parts if not p.get('thought'))
