@@ -5,219 +5,266 @@
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+/* ── COMPACT DASHBOARD ── */
+.dash-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+.dash-kpi {
+  background: #fff;
+  border: 1px solid var(--color-border);
+  border-radius: 10px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  box-shadow: var(--shadow-sm);
+  transition: box-shadow .2s, transform .2s;
+}
+.dash-kpi:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.dash-kpi-icon {
+  width: 32px; height: 32px;
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.dash-kpi-icon svg { width: 16px; height: 16px; }
+.dash-kpi-num   { font-size: 22px; font-weight: 800; color: var(--color-text); line-height: 1; }
+.dash-kpi-label { font-size: 11px; color: var(--color-text-muted); font-weight: 500; }
+
+.dash-charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1.4fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.dash-bottom-row {
+  display: grid;
+  grid-template-columns: 1.2fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.refresh-dot {
+  display: inline-block;
+  width: 7px; height: 7px;
+  background: #10b981;
+  border-radius: 50%;
+  margin-right: 5px;
+  animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity:1; }
+  50%      { opacity:.4; }
+}
+@media (max-width: 1100px) {
+  .dash-kpi-row { grid-template-columns: repeat(4, 1fr); }
+  .dash-charts-row, .dash-bottom-row { grid-template-columns: 1fr; }
+}
+</style>
 {% endblock %}
 
 {% block content %}
 
-<!-- STAT CARDS -->
-<div class="stats-grid" id="statsGrid">
+<!-- KPI STRIP -->
+<div class="dash-kpi-row">
 
-  <div class="stat-card">
-    <div class="stat-icon stat-icon-blue">
+  <div class="dash-kpi">
+    <div class="dash-kpi-icon" style="background:#eff6ff;color:#2563eb">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
         <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
       </svg>
     </div>
-    <div>
-      <div class="stat-number" id="kpi-suppliers">{{ stats.suppliers }}</div>
-      <div class="stat-label">Suppliers</div>
-    </div>
+    <div class="dash-kpi-num" id="kpi-suppliers">{{ stats.suppliers }}</div>
+    <div class="dash-kpi-label">Suppliers</div>
   </div>
 
-  <div class="stat-card">
-    <div class="stat-icon stat-icon-violet">
+  <div class="dash-kpi">
+    <div class="dash-kpi-icon" style="background:#f5f3ff;color:#7c3aed">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
-        <polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/>
       </svg>
     </div>
-    <div>
-      <div class="stat-number" id="kpi-products">{{ stats.products }}</div>
-      <div class="stat-label">Products</div>
-    </div>
+    <div class="dash-kpi-num" id="kpi-products">{{ stats.products }}</div>
+    <div class="dash-kpi-label">Products</div>
   </div>
 
-  <div class="stat-card">
-    <div class="stat-icon stat-icon-amber">
+  <div class="dash-kpi">
+    <div class="dash-kpi-icon" style="background:#fffbeb;color:#d97706">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
-        <line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>
+        <line x1="3" y1="6" x2="21" y2="6"/>
       </svg>
     </div>
-    <div>
-      <div class="stat-number" id="kpi-orders">{{ stats.orders }}</div>
-      <div class="stat-label">Total Orders</div>
-    </div>
+    <div class="dash-kpi-num" id="kpi-orders">{{ stats.orders }}</div>
+    <div class="dash-kpi-label">Total Orders</div>
   </div>
 
-  <div class="stat-card">
-    <div class="stat-icon stat-icon-cyan">
+  <div class="dash-kpi">
+    <div class="dash-kpi-icon" style="background:#ecfeff;color:#0891b2">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
         <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
       </svg>
     </div>
-    <div>
-      <div class="stat-number" id="kpi-shipments">{{ stats.shipments }}</div>
-      <div class="stat-label">Shipments</div>
-    </div>
+    <div class="dash-kpi-num" id="kpi-shipments">{{ stats.shipments }}</div>
+    <div class="dash-kpi-label">Shipments</div>
   </div>
 
-  <div class="stat-card">
-    <div class="stat-icon stat-icon-red">
+  <div class="dash-kpi">
+    <div class="dash-kpi-icon" style="background:#fef2f2;color:#dc2626">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
         <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
       </svg>
     </div>
-    <div>
-      <div class="stat-number" id="kpi-low-stock">{{ stats.low_stock }}</div>
-      <div class="stat-label">Low Stock Items</div>
-    </div>
+    <div class="dash-kpi-num" id="kpi-low-stock">{{ stats.low_stock }}</div>
+    <div class="dash-kpi-label">Low Stock</div>
   </div>
 
-  <div class="stat-card">
-    <div class="stat-icon stat-icon-amber">
+  <div class="dash-kpi">
+    <div class="dash-kpi-icon" style="background:#fffbeb;color:#d97706">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
       </svg>
     </div>
-    <div>
-      <div class="stat-number" id="kpi-pending">{{ stats.pending }}</div>
-      <div class="stat-label">Pending Orders</div>
-    </div>
+    <div class="dash-kpi-num" id="kpi-pending">{{ stats.pending }}</div>
+    <div class="dash-kpi-label">Pending</div>
   </div>
 
-  <div class="stat-card">
-    <div class="stat-icon stat-icon-green">
+  <div class="dash-kpi">
+    <div class="dash-kpi-icon" style="background:#f0fdf4;color:#16a34a">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
       </svg>
     </div>
-    <div>
-      <div class="stat-number" id="kpi-transit">{{ stats.in_transit }}</div>
-      <div class="stat-label">In Transit</div>
-    </div>
+    <div class="dash-kpi-num" id="kpi-transit">{{ stats.in_transit }}</div>
+    <div class="dash-kpi-label">In Transit</div>
   </div>
 
 </div>
 
-<!-- LIVE CHARTS ROW -->
-<div class="grid-2" style="margin-bottom:20px">
+<!-- CHARTS ROW -->
+<div class="dash-charts-row">
 
   <div class="card">
-    <div class="card-header">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21.21 15.89A10 10 0 118 2.83"/>
-        <path d="M22 12A10 10 0 0012 2v10z"/>
-      </svg>
-      Order Status
+    <div class="card-header" style="font-size:12.5px;padding:12px 16px">
+      <span class="refresh-dot"></span> Order Status
       <span id="lastUpdate" style="margin-left:auto;font-size:11px;font-weight:400;color:var(--color-text-muted)">Live</span>
     </div>
-    <div class="card-body">
-      <canvas id="statusChart" height="200"></canvas>
+    <div class="card-body" style="padding:16px">
+      <canvas id="statusChart" height="180"></canvas>
     </div>
   </div>
 
   <div class="card">
-    <div class="card-header">
+    <div class="card-header" style="font-size:12.5px;padding:12px 16px">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
         <polyline points="9 22 9 12 15 12 15 22"/>
       </svg>
       Stock by Warehouse
     </div>
-    <div class="card-body">
-      <canvas id="warehouseChart" height="200"></canvas>
+    <div class="card-body" style="padding:16px">
+      <canvas id="warehouseChart" height="180"></canvas>
     </div>
   </div>
 
 </div>
 
-<!-- LIVE MAP -->
-<div class="card" style="margin-bottom:20px">
-  <div class="card-header">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-      <polygon points="3 11 22 2 13 21 11 13 3 11"/>
-    </svg>
-    Live Shipments Map
-    <a href="{{ url_for('shipments') }}" class="td-muted"
-       style="margin-left:auto;font-weight:500;text-decoration:none;font-size:13px">
-      {{ stats.in_transit }} in transit · view all →
-    </a>
-  </div>
-  <div class="card-body">
-    <div id="dash-map" class="map-box map-box-sm"></div>
-  </div>
-</div>
+<!-- MAP + TABLES ROW -->
+<div class="dash-bottom-row">
 
-<!-- BOTTOM GRID -->
-<div class="grid-2">
-
-  <!-- RECENT ORDERS -->
+  <!-- MAP -->
   <div class="card">
-    <div class="card-header">
+    <div class="card-header" style="font-size:12.5px;padding:12px 16px">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
-        <line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 01-8 0"/>
+        <polygon points="3 11 22 2 13 21 11 13 3 11"/>
       </svg>
-      Recent Orders
+      Live Shipments Map
+      <a href="{{ url_for('shipments') }}" style="margin-left:auto;font-size:11px;color:var(--color-primary);text-decoration:none;font-weight:500">
+        {{ stats.in_transit }} in transit →
+      </a>
     </div>
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr><th>#</th><th>Customer</th><th>Product</th><th>Qty</th><th>Status</th></tr>
-        </thead>
-        <tbody>
-          {% for o in recent_orders %}
-          <tr>
-            <td class="td-muted">{{ o.order_id }}</td>
-            <td class="fw-600">{{ o.customer_name }}</td>
-            <td>{{ o.product_name }}</td>
-            <td>{{ o.quantity }}</td>
-            <td><span class="badge badge-{{ o.status | lower }}">{{ o.status }}</span></td>
-          </tr>
-          {% else %}
-          <tr class="empty-row"><td colspan="5">No orders yet.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <div class="card-body" style="padding:12px">
+      <div id="dash-map" style="height:260px;border-radius:8px;border:1px solid var(--color-border)"></div>
     </div>
   </div>
 
-  <!-- LOW STOCK -->
-  <div class="card">
-    <div class="card-header" style="color:#dc2626">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#dc2626">
-        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-      </svg>
-      Low Stock Alert
-      {% if stats.low_stock > 0 %}
-        <span class="badge badge-danger" style="margin-left:auto">{{ stats.low_stock }} items</span>
-      {% endif %}
-    </div>
-    <div class="table-wrapper">
-      <table>
-        <thead>
-          <tr><th>Product</th><th>Warehouse</th><th>Qty</th></tr>
-        </thead>
-        <tbody>
-          {% for s in low_stock %}
-          <tr>
-            <td class="fw-600">{{ s.product_name }}</td>
-            <td class="td-muted">{{ s.warehouse }}</td>
-            <td><span class="badge badge-danger">{{ s.quantity }}</span></td>
-          </tr>
-          {% else %}
-          <tr class="empty-row"><td colspan="3">All stock levels are healthy.</td></tr>
-          {% endfor %}
-        </tbody>
-      </table>
-    </div>
-  </div>
+  <!-- SIDE TABLES -->
+  <div style="display:flex;flex-direction:column;gap:16px">
 
+    <!-- RECENT ORDERS -->
+    <div class="card">
+      <div class="card-header" style="font-size:12.5px;padding:12px 16px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+          <line x1="3" y1="6" x2="21" y2="6"/>
+        </svg>
+        Recent Orders
+      </div>
+      <div class="table-wrapper">
+        <table style="font-size:12.5px">
+          <thead>
+            <tr><th>Customer</th><th>Product</th><th>Status</th></tr>
+          </thead>
+          <tbody>
+            {% for o in recent_orders %}
+            <tr>
+              <td class="fw-600" style="padding:9px 14px">{{ o.customer_name }}</td>
+              <td style="padding:9px 14px;color:var(--color-text-muted)">{{ o.product_name }}</td>
+              <td style="padding:9px 14px">
+                <span class="badge badge-{{ o.status|lower }}" style="font-size:10.5px">{{ o.status }}</span>
+              </td>
+            </tr>
+            {% else %}
+            <tr class="empty-row"><td colspan="3">No orders yet.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- LOW STOCK -->
+    <div class="card">
+      <div class="card-header" style="font-size:12.5px;padding:12px 16px;color:#dc2626">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#dc2626">
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+        Low Stock Alert
+        {% if stats.low_stock > 0 %}
+          <span class="badge badge-danger" style="margin-left:auto;font-size:10.5px">{{ stats.low_stock }}</span>
+        {% endif %}
+      </div>
+      <div class="table-wrapper">
+        <table style="font-size:12.5px">
+          <thead>
+            <tr><th>Product</th><th>Warehouse</th><th>Qty</th></tr>
+          </thead>
+          <tbody>
+            {% for s in low_stock %}
+            <tr>
+              <td class="fw-600" style="padding:9px 14px">{{ s.product_name }}</td>
+              <td style="padding:9px 14px;color:var(--color-text-muted)">{{ s.warehouse }}</td>
+              <td style="padding:9px 14px">
+                <span class="badge badge-danger" style="font-size:10.5px">{{ s.quantity }}</span>
+              </td>
+            </tr>
+            {% else %}
+            <tr class="empty-row"><td colspan="3">All healthy.</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -225,89 +272,79 @@
 <script>SCWMS.initOverview('dash-map', {{ map_data|tojson }});</script>
 
 <script>
-/* ── LIVE DASHBOARD CHARTS ── */
 (function(){
-  const GRID = 'rgba(100,116,139,.12)';
+  const GRID = 'rgba(100,116,139,.1)';
   const TEXT = '#94a3b8';
   Chart.defaults.color      = TEXT;
   Chart.defaults.font.family = 'Inter, sans-serif';
-  Chart.defaults.font.size   = 12;
+  Chart.defaults.font.size   = 11;
 
-  const statusColors = {
-    'Pending':'#f59e0b','Processing':'#3b82f6','Shipped':'#06b6d4',
-    'Delivered':'#10b981','Cancelled':'#ef4444'
-  };
+  const SC = {'Pending':'#f59e0b','Processing':'#3b82f6','Shipped':'#06b6d4','Delivered':'#10b981','Cancelled':'#ef4444'};
 
-  /* Status donut */
-  const statusCtx = document.getElementById('statusChart');
-  const statusChart = new Chart(statusCtx, {
+  const sDough = new Chart(document.getElementById('statusChart'), {
     type: 'doughnut',
-    data: { labels:[], datasets:[{ data:[], backgroundColor:[], borderWidth:2, borderColor:'#fff', hoverOffset:6 }] },
+    data: { labels:[], datasets:[{ data:[], backgroundColor:[], borderWidth:2, borderColor:'#fff', hoverOffset:4 }] },
     options: {
-      responsive:true, cutout:'64%',
-      plugins:{ legend:{ position:'bottom', labels:{ padding:14, usePointStyle:true } } }
-    }
-  });
-
-  /* Warehouse bar */
-  const whCtx = document.getElementById('warehouseChart');
-  const whChart = new Chart(whCtx, {
-    type: 'bar',
-    data: { labels:[], datasets:[{ label:'Stock Units', data:[], backgroundColor:'#3b82f6', borderRadius:5 }] },
-    options: {
-      responsive:true,
-      plugins:{ legend:{ display:false } },
-      scales:{
-        x:{ grid:{ display:false } },
-        y:{ grid:{ color:GRID }, beginAtZero:true }
+      responsive:true, cutout:'68%',
+      plugins:{
+        legend:{ position:'bottom', labels:{ padding:12, usePointStyle:true, font:{size:11} } }
       }
     }
   });
 
-  const kpiMap = {
+  const wBar = new Chart(document.getElementById('warehouseChart'), {
+    type: 'bar',
+    data: { labels:[], datasets:[{
+      label:'Units', data:[],
+      backgroundColor: ['#3b82f6','#06b6d4','#8b5cf6','#f59e0b','#10b981'],
+      borderRadius:5, borderSkipped:false
+    }]},
+    options:{
+      responsive:true,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ grid:{ display:false }, ticks:{font:{size:10}} },
+        y:{ grid:{ color:GRID }, beginAtZero:true, ticks:{font:{size:10}} }
+      }
+    }
+  });
+
+  const kMap = {
     suppliers:'kpi-suppliers', products:'kpi-products', orders:'kpi-orders',
     shipments:'kpi-shipments', low_stock:'kpi-low-stock',
     pending:'kpi-pending', in_transit:'kpi-transit'
   };
 
-  function animateNum(el, target){
-    const cur = parseInt(el.textContent) || 0;
-    if(cur === target) return;
-    const step = Math.ceil(Math.abs(target-cur)/8);
-    const dir  = target > cur ? 1 : -1;
-    let v = cur;
-    const t = setInterval(function(){
-      v += dir*step;
-      if((dir>0 && v>=target)||(dir<0 && v<=target)){ v=target; clearInterval(t); }
-      el.textContent = v;
-    }, 40);
+  function animNum(el, to){
+    const from = parseInt(el.textContent)||0;
+    if(from===to) return;
+    const d = to>from?1:-1, step=Math.ceil(Math.abs(to-from)/6);
+    let v=from;
+    const t=setInterval(()=>{
+      v+=d*step;
+      if((d>0&&v>=to)||(d<0&&v<=to)){v=to;clearInterval(t);}
+      el.textContent=v;
+    },40);
   }
 
   function refresh(){
-    fetch('/api/dashboard/live').then(r=>r.json()).then(function(d){
+    fetch('/api/dashboard/live').then(r=>r.json()).then(d=>{
       if(!d.ok) return;
-      /* KPI numbers */
-      Object.entries(kpiMap).forEach(function([key,id]){
-        const el = document.getElementById(id);
-        if(el) animateNum(el, d.stats[key]||0);
-      });
-      /* Status donut */
-      statusChart.data.labels   = d.status.map(x=>x.s);
-      statusChart.data.datasets[0].data            = d.status.map(x=>x.c);
-      statusChart.data.datasets[0].backgroundColor = d.status.map(x=>statusColors[x.s]||'#94a3b8');
-      statusChart.update('none');
-      /* Warehouse bar */
-      whChart.data.labels = d.wh.map(x=>x.l);
-      whChart.data.datasets[0].data = d.wh.map(x=>x.v);
-      whChart.update('none');
-      /* timestamp */
-      const el = document.getElementById('lastUpdate');
-      if(el) el.textContent = 'Updated ' + new Date().toLocaleTimeString();
-    }).catch(function(){});
+      Object.entries(kMap).forEach(([k,id])=>{ const e=document.getElementById(id); if(e) animNum(e,d.stats[k]||0); });
+      sDough.data.labels   = d.status.map(x=>x.s);
+      sDough.data.datasets[0].data            = d.status.map(x=>x.c);
+      sDough.data.datasets[0].backgroundColor = d.status.map(x=>SC[x.s]||'#94a3b8');
+      sDough.update('none');
+      wBar.data.labels = d.wh.map(x=>x.l);
+      wBar.data.datasets[0].data = d.wh.map(x=>x.v);
+      wBar.update('none');
+      const lu=document.getElementById('lastUpdate');
+      if(lu) lu.textContent='Updated '+new Date().toLocaleTimeString();
+    }).catch(()=>{});
   }
 
-  refresh();                       /* initial load */
-  setInterval(refresh, 30000);    /* auto-refresh every 30s */
+  refresh();
+  setInterval(refresh, 30000);
 })();
 </script>
 {% endblock %}
