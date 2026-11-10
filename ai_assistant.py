@@ -16,10 +16,10 @@ import requests
 
 import config
 
-MAX_ROWS        = 50           # rows returned to the UI
-SUMMARY_ROWS    = 10           # rows sent to the LLM for the explanation
-STATEMENT_MS    = 4000         # DB statement timeout
-HTTP_TIMEOUT    = 8            # seconds per LLM call (Vercel hobby = 10s max)
+MAX_ROWS        = 100          # rows returned to the UI
+SUMMARY_ROWS    = 20           # rows sent to the LLM for the explanation
+STATEMENT_MS    = 5000         # DB statement timeout
+HTTP_TIMEOUT    = 25           # seconds per LLM call
 # columns that hold personal data are never sent to the LLM
 PII_COLUMNS = {'phone', 'email', 'contact', 'address', 'customer_address',
                'supplier_email', 'supplier_contact', 'password'}
@@ -115,33 +115,17 @@ def validate_sql(sql):
 #  2. LLM PROVIDERS  (Gemini primary, Groq backup)
 # ──────────────────────────────────────────────────────────────
 def _gemini(model, system, messages):
-    # Try v1 first, fall back to v1beta
-    for api_ver in ('v1', 'v1beta'):
-        url = (f'https://generativelanguage.googleapis.com/{api_ver}/models/'
-               f'{model}:generateContent?key={config.GEMINI_API_KEY}')
-        body = {
-            'contents': [
-                {'role': 'user',
-                 'parts': [{'text': f'[System context]\n{system}\n\n[User question]\n{messages[-1]["content"]}'}]}
-            ],
-            'generationConfig': {'temperature': 0.1, 'maxOutputTokens': 800},
-        }
-        r = requests.post(url, json=body, timeout=HTTP_TIMEOUT,
-                          headers={'Content-Type': 'application/json'})
-        if r.status_code == 200:
-            data  = r.json()
-            parts = (data.get('candidates') or [{}])[0].get('content', {}).get('parts', [])
-            text  = ''.join(p.get('text', '') for p in parts if not p.get('thought'))
-            if text.strip():
-                return text
-        elif r.status_code != 404:
-            # 404 = try next api version; anything else = real error
-            try: err_msg = r.json().get('error', {}).get('message', r.text[:200])
-            except: err_msg = r.text[:200]
-            raise _HttpError(r.status_code, err_msg)
-    try: err_msg = r.json().get('error', {}).get('message', r.text[:200])
-    except: err_msg = r.text[:200]
-    raise _HttpError(404, err_msg)
+    url = f'https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent'
+    body = {
+        'systemInstruction': {'parts': [{'text': system}]},
+        'contents': [{'role': 'model' if m['role'] == 'assistant' else 'user',
+                      'parts': [{'text': m['content']}]} for m in messages],
+        'generationConfig': {'temperature': 0.1, 'maxOutputTokens': 1024},
+    }
+    r = requests.post(url, json=body, timeout=HTTP_TIMEOUT,
+                      headers={'x-goog-api-key': config.GEMINI_API_KEY, 'Content-Type': 'application/json'})
+    if r.status_code != 200:
+        raise _HttpError(r.status_code, r.text)
     data = r.json()
     parts = (data.get('candidates') or [{}])[0].get('content', {}).get('parts', [])
     text = ''.join(p.get('text', '') for p in parts if not p.get('thought'))
@@ -152,7 +136,7 @@ def _gemini(model, system, messages):
 
 def _groq(model, system, messages):
     body = {
-        'model': model, 'temperature': 0.1, 'max_tokens': 800,
+        'model': model, 'temperature': 0.1, 'max_tokens': 2048,
         'messages': [{'role': 'system', 'content': system}] + messages,
     }
     r = requests.post('https://api.groq.com/openai/v1/chat/completions', json=body, timeout=HTTP_TIMEOUT,
@@ -168,9 +152,15 @@ def _groq(model, system, messages):
 
 class _HttpError(Exception):
     def __init__(self, status, body):
-        super().__init__(f'HTTP {status}')
         self.status = status
-        self.body = (body or '')[:200]
+        self.body = (body or '')[:300]
+        msg = ''
+        try:                                   # both Gemini and Groq return {"error": {"message": ...}}
+            msg = json.loads(body)['error']['message']
+        except Exception:
+            pass
+        msg = re.sub(r'\s+', ' ', str(msg))[:110]
+        super().__init__(f'HTTP {status}' + (f' ({msg})' if msg else ''))
 
 
 def _providers():
@@ -184,22 +174,87 @@ def _providers():
     return out
 
 
+_DISCOVERED = {}          # provider -> (timestamp, [model ids])  (cached for 1 hour per server instance)
+
+
+def _discover(name):
+    """Ask the provider which chat models are available right now (self-healing when a model is retired)."""
+    import time
+    hit = _DISCOVERED.get(name)
+    if hit and time.time() - hit[0] < 3600:
+        return hit[1]
+    models = []
+    try:
+        if name == 'Gemini':
+            r = requests.get('https://generativelanguage.googleapis.com/v1beta/models?pageSize=200', timeout=15,
+                             headers={'x-goog-api-key': config.GEMINI_API_KEY})
+            if r.status_code == 200:
+                skip = ('image', 'tts', 'live', 'audio', 'embed', 'robotics', 'computer', 'thinking', 'exp', 'learn')
+                for m in r.json().get('models', []):
+                    n = m.get('name', '').replace('models/', '')
+                    if (n.startswith('gemini') and 'flash' in n and 'generateContent' in m.get('supportedGenerationMethods', [])
+                            and not any(x in n for x in skip)):
+                        models.append(n)
+                def key(n):
+                    v = re.search(r'gemini-(\d+(?:\.\d+)?)', n)
+                    return (-(float(v.group(1)) if v else 0), 'lite' in n, 'preview' in n, n)
+                models.sort(key=key)
+        else:
+            r = requests.get('https://api.groq.com/openai/v1/models', timeout=15,
+                             headers={'Authorization': f'Bearer {config.GROQ_API_KEY}'})
+            if r.status_code == 200:
+                skip = ('whisper', 'tts', 'guard', 'safeguard', 'orpheus', 'playai', 'distil', 'embed', 'compound', 'vision')
+                ids = [m.get('id', '') for m in r.json().get('data', [])]
+                ids = [i for i in ids if i and not any(x in i for x in skip)]
+                pref = ('openai/gpt-oss-120b', 'openai/gpt-oss-20b')
+                models = sorted(ids, key=lambda i: (i not in pref, pref.index(i) if i in pref else 0,
+                                                    not i.startswith(('qwen', 'llama')), i))
+    except requests.RequestException:
+        pass
+    _DISCOVERED[name] = (time.time(), models)
+    return models
+
+
+def _attempt(name, fn, model, system, messages, errors, statuses):
+    """One model call. Returns (text, provider, model) on success, 'KEY' for a rejected key, else None."""
+    try:
+        return fn(model, system, messages), name, model
+    except _HttpError as e:
+        errors.append(f'{name}/{model}: {e}')
+        statuses.append(e.status)
+        if e.status in (401, 403):
+            return 'KEY'
+    except requests.RequestException as e:
+        errors.append(f'{name}/{model}: network error ({type(e).__name__})')
+    return None
+
+
 def chat(system, messages):
-    """Try providers/models in order. Returns (text, provider_name, model)."""
+    """Try providers/models in order. Returns (text, provider_name, model).
+    If every configured model is rejected as unknown/retired (404/400), the provider is asked
+    which models exist today and the best few are tried automatically."""
     providers = _providers()
     if not providers:
         raise AIUnavailable('AI is not configured yet. Add GEMINI_API_KEY and/or GROQ_API_KEY to the .env file.')
     errors = []
     for name, fn, models in providers:
+        statuses, tried, bad_key = [], set(), False
         for model in models:
-            try:
-                return fn(model, system, messages), name, model
-            except _HttpError as e:
-                errors.append(f'{name}/{model}: {e}')
-                if e.status in (401, 403):      # bad key -> skip this provider entirely
-                    break
-            except requests.RequestException as e:
-                errors.append(f'{name}/{model}: network error ({type(e).__name__})')
+            tried.add(model)
+            out = _attempt(name, fn, model, system, messages, errors, statuses)
+            if out == 'KEY':
+                bad_key = True
+                break
+            if out:
+                return out
+        if bad_key or not any(st in (400, 404) for st in statuses):
+            continue
+        for model in [m for m in _discover(name) if m not in tried][:3]:
+            out = _attempt(name, fn, model, system, messages, errors, statuses)
+            if out == 'KEY':
+                break
+            if out:
+                return out
     raise AIUnavailable('All AI providers failed — ' + '; '.join(errors[-4:]))
 
 
