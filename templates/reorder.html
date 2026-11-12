@@ -1,13 +1,20 @@
 {% extends 'base.html' %}
 {% block title %}Reorder Alerts{% endblock %}
-{% block page_title %}Reorder Alerts{% endblock %}
+{% block page_title %}Reorder Alerts &amp; Replenishment{% endblock %}
 {% block content %}
-<div style="background:#fef2f2;border-left:3px solid #dc2626;border-radius:8px;padding:12px 16px;font-size:13px;color:#991b1b;margin-bottom:20px">
-  <strong>Inventory Intelligence Alert:</strong> The following products are at or below their defined reorder point. Immediate replenishment action is required to avoid stockout.
+
+<div class="page-actions" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+  <div style="position:relative;width:280px">
+    <input type="text" id="tableSearch" class="form-input" placeholder="Search reorder items..." style="padding-left:34px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--color-text-muted);pointer-events:none">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  </div>
 </div>
+
 <div class="card">
   <div class="table-wrapper">
-    <table>
+    <table id="dataTable">
       <thead>
         <tr><th>Product</th><th>Category</th><th>Warehouse</th><th>Current Stock</th><th>Reorder Point</th><th>Safety Stock</th><th>Units Needed</th></tr>
       </thead>
@@ -15,7 +22,7 @@
         {% for a in alerts %}
         <tr>
           <td class="fw-600">{{ a.product_name }}</td>
-          <td><span class="badge badge-secondary">{{ a.category or '—' }}</span></td>
+          <td><span class="badge badge-info">{{ a.category or '—' }}</span></td>
           <td class="td-muted">{{ a.warehouse }}</td>
           <td><span class="badge badge-danger">{{ a.current_stock }}</span></td>
           <td>{{ a.reorder_point }}</td>
@@ -23,10 +30,19 @@
           <td><span class="badge badge-warning">{{ a.units_needed }}</span></td>
         </tr>
         {% else %}
-        <tr class="empty-row"><td colspan="7">No reorder alerts — all inventory levels are above reorder points.</td></tr>
+        <tr class="empty-row"><td colspan="7">No reorder alerts — all inventory levels are above safety reorder points.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
+
+<script>
+document.getElementById('tableSearch')?.addEventListener('input', e => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(tr => {
+    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+</script>
 {% endblock %}

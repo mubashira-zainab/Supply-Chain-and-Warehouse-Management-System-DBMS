@@ -3,8 +3,13 @@
 {% block page_title %}Order Management{% endblock %}
 {% block content %}
 
-<div class="page-actions">
-  <h2 style="font-size:14px;color:var(--color-text-muted);font-weight:500">{{ orders|length }} order(s) total</h2>
+<div class="page-actions" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+  <div style="position:relative;width:280px">
+    <input type="text" id="tableSearch" class="form-input" placeholder="Search orders..." style="padding-left:34px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--color-text-muted);pointer-events:none">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  </div>
   <button class="btn btn-primary" onclick="openModal('addModal')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     Place New Order
@@ -13,61 +18,61 @@
 
 <div class="card">
   <div class="table-wrapper">
-    <table>
+    <table id="dataTable">
       <thead>
-        <tr><th>#</th><th>Customer</th><th>Product</th><th>Supplier</th><th>Qty</th><th>Date</th><th>Status</th><th>Actions</th></tr>
+        <tr><th>ID</th><th>Customer</th><th>Product</th><th>Supplier</th><th>Qty</th><th>Date</th><th>Status</th><th>Actions</th></tr>
       </thead>
       <tbody>
         {% for o in orders %}
         <tr>
-          <td class="td-muted">{{ o.order_id }}</td>
+          <td class="td-muted">#{{ o.order_id }}</td>
           <td class="fw-600">{{ o.customer_name }}</td>
           <td>{{ o.product_name }}</td>
           <td class="td-muted">{{ o.supplier_name }}</td>
-          <td>{{ o.quantity }}</td>
+          <td class="fw-700">{{ o.quantity }}</td>
           <td class="td-muted">{{ o.order_date }}</td>
           <td><span class="badge badge-{{ o.status|lower }}">{{ o.status }}</span></td>
           <td style="display:flex;gap:6px">
-            <button class="btn btn-outline btn-sm" onclick="openModal('statusModal{{ o.order_id }}')">
+            <button class="btn btn-outline btn-sm" onclick="openModal('statusModal{{ o.order_id }}')" title="Change Status">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Status
             </button>
             <a href="{{ url_for('delete_order', oid=o.order_id) }}"
                class="btn btn-ghost-danger btn-sm"
                onclick="return confirm('Delete order #{{ o.order_id }}?')">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
+              Delete
             </a>
           </td>
         </tr>
 
-        <!-- Status Update Modal per order -->
+        <!-- STATUS MODAL -->
         <div class="modal-overlay" id="statusModal{{ o.order_id }}">
-          <div class="modal" style="max-width:340px">
+          <div class="modal" style="max-width:360px">
             <div class="modal-header">
               <span class="modal-title">Update Order #{{ o.order_id }}</span>
-              <button class="modal-close" onclick="closeModal('statusModal{{ o.order_id }}')">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-              </button>
+              <button class="modal-close" onclick="closeModal('statusModal{{ o.order_id }}')">&times;</button>
             </div>
             <form method="POST" action="{{ url_for('update_order_status', oid=o.order_id) }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
               <div class="modal-body">
-                <label class="form-label">New Status</label>
+                <label class="form-label">Order Status</label>
                 <select name="status" class="form-select">
                   {% for st in ['Pending','Processing','Shipped','Delivered','Cancelled'] %}
                   <option value="{{ st }}" {% if st == o.status %}selected{% endif %}>{{ st }}</option>
                   {% endfor %}
                 </select>
-                <p class="form-hint" style="margin-top:8px">Setting status to <strong>Shipped</strong> automatically creates a shipment record via database trigger.</p>
+                <p class="form-hint" style="margin-top:8px">When set to <strong>Shipped</strong>, a tracking shipment record is generated automatically.</p>
               </div>
               <div class="modal-footer">
                 <button type="button" class="btn btn-outline" onclick="closeModal('statusModal{{ o.order_id }}')">Cancel</button>
-                <button type="submit" class="btn btn-primary btn-sm">Update Status</button>
+                <button type="submit" class="btn btn-primary">Update Status</button>
               </div>
             </form>
           </div>
         </div>
         {% else %}
-        <tr class="empty-row"><td colspan="8">No orders placed yet.</td></tr>
+        <tr class="empty-row"><td colspan="8">No orders found.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -78,21 +83,16 @@
 <div class="modal-overlay" id="addModal">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Place New Order
-      </span>
-      <button class="modal-close" onclick="closeModal('addModal')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      <span class="modal-title">Place New Order</span>
+      <button class="modal-close" onclick="closeModal('addModal')">&times;</button>
     </div>
     <form method="POST" action="{{ url_for('add_order') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">Customer *</label>
           <select name="customer_id" class="form-select" required>
-            <option value="">-- Select Customer --</option>
+            <option value="">— Select Customer —</option>
             {% for c in customers %}
             <option value="{{ c.customer_id }}">{{ c.name }}</option>
             {% endfor %}
@@ -101,27 +101,27 @@
         <div class="form-group">
           <label class="form-label">Product *</label>
           <select name="product_id" class="form-select" required>
-            <option value="">-- Select Product --</option>
+            <option value="">— Select Product —</option>
             {% for p in products %}
-            <option value="{{ p.product_id }}">{{ p.product_name }} — Rs. {{ "{:,.0f}".format(p.price) }}</option>
+            <option value="{{ p.product_id }}">{{ p.product_name }} (Rs. {{ "{:,.0f}".format(p.price) }})</option>
             {% endfor %}
           </select>
         </div>
         <div class="form-group">
           <label class="form-label">Quantity *</label>
-          <input type="number" name="quantity" class="form-input" min="1" required placeholder="e.g. 10">
+          <input type="number" name="quantity" class="form-input" min="1" value="10" required>
         </div>
         <div class="form-group">
           <label class="form-label">Order Date *</label>
           <input type="date" name="order_date" class="form-input" value="{{ today }}" required>
         </div>
-        <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 14px;font-size:12.5px;color:#1e40af">
-          <strong>Trigger Active:</strong> Stock is automatically deducted from warehouse inventory when this order is placed (via PostgreSQL trigger trg_reduce_stock).
+        <div style="background:var(--bg-body);border:1px solid var(--color-border);border-radius:6px;padding:10px 12px;font-size:12px;color:var(--color-text-muted)">
+          <strong>Inventory Sync:</strong> Stock quantity is automatically deducted from central warehouse upon order creation.
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline" onclick="closeModal('addModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Place Order</button>
+        <button type="submit" class="btn btn-primary">Create Order</button>
       </div>
     </form>
   </div>
@@ -130,8 +130,14 @@
 <script>
 function openModal(id){ document.getElementById(id).classList.add('open'); }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.modal-overlay').forEach(function(el){
-  el.addEventListener('click', function(e){ if(e.target===el) el.classList.remove('open'); });
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if(e.target===el) el.classList.remove('open'); });
+});
+document.getElementById('tableSearch')?.addEventListener('input', e => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(tr => {
+    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
 });
 </script>
 {% endblock %}

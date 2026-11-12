@@ -471,7 +471,21 @@ def add_supplier():
         flash(f'Error: {e}', 'error')
     return redirect(url_for('suppliers'))
 
-@app.route('/suppliers/delete/<int:sid>', methods=['POST'])
+@app.route('/suppliers/edit/<int:sid>', methods=['POST'])
+@login_required
+@role_required('Admin', 'Manager')
+def edit_supplier(sid):
+    try:
+        db_exec(
+            'UPDATE Supplier SET Name=%s, Contact=%s, Email=%s, Address=%s WHERE Supplier_ID=%s',
+            (request.form['name'], request.form['contact'],
+             request.form['email'], request.form['address'], sid))
+        flash('Supplier updated successfully.', 'success')
+    except Exception as e:
+        flash(f'Error updating supplier: {e}', 'error')
+    return redirect(url_for('suppliers'))
+
+@app.route('/suppliers/delete/<int:sid>', methods=['POST', 'GET'])
 @login_required
 @role_required('Admin')
 def delete_supplier(sid):
@@ -506,7 +520,21 @@ def add_product():
         flash(f'Error: {e}', 'error')
     return redirect(url_for('products'))
 
-@app.route('/products/delete/<int:pid>', methods=['POST'])
+@app.route('/products/edit/<int:pid>', methods=['POST'])
+@login_required
+@role_required('Admin', 'Manager')
+def edit_product(pid):
+    try:
+        db_exec(
+            'UPDATE Product SET Product_Name=%s, Category=%s, Price=%s, Supplier_ID=%s WHERE Product_ID=%s',
+            (request.form['product_name'], request.form['category'],
+             request.form['price'], request.form['supplier_id'], pid))
+        flash('Product updated successfully.', 'success')
+    except Exception as e:
+        flash(f'Error updating product: {e}', 'error')
+    return redirect(url_for('products'))
+
+@app.route('/products/delete/<int:pid>', methods=['POST', 'GET'])
 @login_required
 @role_required('Admin')
 def delete_product(pid):
@@ -540,7 +568,20 @@ def add_warehouse():
         flash(f'Error: {e}', 'error')
     return redirect(url_for('warehouses'))
 
-@app.route('/warehouses/delete/<int:wid>', methods=['POST'])
+@app.route('/warehouses/edit/<int:wid>', methods=['POST'])
+@login_required
+@role_required('Admin', 'Manager')
+def edit_warehouse(wid):
+    try:
+        hit = geo.resolve(request.form['location'])
+        db_exec('UPDATE Warehouse SET Location=%s, Latitude=%s, Longitude=%s WHERE Warehouse_ID=%s',
+                (request.form['location'], hit[0] if hit else None, hit[1] if hit else None, wid))
+        flash('Warehouse updated successfully.', 'success')
+    except Exception as e:
+        flash(f'Error updating warehouse: {e}', 'error')
+    return redirect(url_for('warehouses'))
+
+@app.route('/warehouses/delete/<int:wid>', methods=['POST', 'GET'])
 @login_required
 @role_required('Admin')
 def delete_warehouse(wid):
@@ -618,7 +659,22 @@ def add_customer():
         flash(f'Error: {e}', 'error')
     return redirect(url_for('customers'))
 
-@app.route('/customers/delete/<int:cid>', methods=['POST'])
+@app.route('/customers/edit/<int:cid>', methods=['POST'])
+@login_required
+@role_required('Admin', 'Manager')
+def edit_customer(cid):
+    try:
+        hit = geo.resolve(request.form.get('address', ''))
+        db_exec(
+            'UPDATE Customer SET Name=%s, Phone=%s, Email=%s, Address=%s, Latitude=%s, Longitude=%s WHERE Customer_ID=%s',
+            (request.form['name'], request.form['phone'], request.form['email'], request.form['address'],
+             hit[0] if hit else None, hit[1] if hit else None, cid))
+        flash('Customer updated successfully.', 'success')
+    except Exception as e:
+        flash(f'Error updating customer: {e}', 'error')
+    return redirect(url_for('customers'))
+
+@app.route('/customers/delete/<int:cid>', methods=['POST', 'GET'])
 @login_required
 @role_required('Admin')
 def delete_customer(cid):
@@ -668,7 +724,21 @@ def update_order_status(oid):
         flash(f'Error: {e}', 'error')
     return redirect(url_for('orders'))
 
-@app.route('/orders/delete/<int:oid>', methods=['POST'])
+@app.route('/orders/edit/<int:oid>', methods=['POST'])
+@login_required
+@role_required('Admin', 'Manager')
+def edit_order(oid):
+    try:
+        db_exec(
+            'UPDATE Orders SET Customer_ID=%s, Product_ID=%s, Quantity=%s, Status=%s WHERE Order_ID=%s',
+            (request.form['customer_id'], request.form['product_id'],
+             request.form['quantity'], request.form['status'], oid))
+        flash('Order updated successfully.', 'success')
+    except Exception as e:
+        flash(f'Error updating order: {e}', 'error')
+    return redirect(url_for('orders'))
+
+@app.route('/orders/delete/<int:oid>', methods=['POST', 'GET'])
 @login_required
 @role_required('Admin')
 def delete_order(oid):

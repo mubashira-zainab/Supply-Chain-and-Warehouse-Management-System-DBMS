@@ -6,16 +6,33 @@
 {% endblock %}
 {% block content %}
 
-<div class="card" style="margin-bottom:20px">
-  <div class="card-header">Live Shipment Map
-    <span class="td-muted" style="margin-left:auto;font-weight:400">🏭 warehouse &nbsp; 🚚 in transit &nbsp; 📍 destination &nbsp; ✅ delivered</span>
+<div class="card" style="margin-bottom:16px">
+  <div class="card-header" style="padding:10px 14px;font-size:12.5px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+      <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+    </svg>
+    Active Transit Map
+    <span class="td-muted" style="margin-left:auto;font-size:11.5px;font-weight:400">
+      Warehouse &bull; Moving Truck &bull; Checkpoint &bull; Delivery Node
+    </span>
   </div>
-  <div class="card-body"><div id="ship-map" class="map-box"></div></div>
+  <div class="card-body" style="padding:8px">
+    <div id="ship-map" class="map-box" style="height:340px;border-radius:6px"></div>
+  </div>
 </div>
 
-<div class="card" style="margin-bottom:20px">
+<div class="page-actions" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+  <div style="position:relative;width:280px">
+    <input type="text" id="tableSearch" class="form-input" placeholder="Search shipments, tracking #..." style="padding-left:34px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--color-text-muted);pointer-events:none">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  </div>
+</div>
+
+<div class="card">
   <div class="table-wrapper">
-    <table>
+    <table id="dataTable">
       <thead>
         <tr><th>Tracking No</th><th>Order</th><th>Customer</th><th>Product</th><th>Qty</th>
             <th>Route</th><th>Last Scan</th><th>Status</th><th>Actions</th></tr>
@@ -23,17 +40,17 @@
       <tbody>
         {% for s in shipments %}
         <tr>
-          <td class="fw-600">{{ s.tracking_no }}</td>
+          <td class="fw-700" style="color:var(--color-primary)">{{ s.tracking_no }}</td>
           <td class="td-muted">#{{ s.order_id }}</td>
-          <td>{{ s.customer_name }}</td>
+          <td class="fw-600">{{ s.customer_name }}</td>
           <td>{{ s.product_name }}</td>
           <td>{{ s.quantity }}</td>
-          <td class="td-muted">{{ s.origin_warehouse or '—' }} → {{ s.customer_address or '—' }}</td>
-          <td class="td-muted">{{ s.last_location or '—' }}<br>
-              <span class="small">{{ s.last_event_time.strftime('%d %b, %H:%M') if s.last_event_time else '' }}</span></td>
+          <td class="td-muted">{{ s.origin_warehouse or 'Central Hub' }} &rarr; {{ s.customer_address or '—' }}</td>
+          <td class="td-muted">{{ s.last_location or 'Dispatched' }}<br>
+              <span class="small" style="color:var(--color-text-light)">{{ s.last_event_time.strftime('%d %b, %H:%M') if s.last_event_time else '' }}</span></td>
           <td>
             {% if s.shipment_status == 'Delivered' %}<span class="badge badge-delivered">Delivered</span>
-            {% elif s.shipment_status == 'Returned' %}<span class="badge badge-returned">Returned</span>
+            {% elif s.shipment_status == 'Returned' %}<span class="badge badge-danger">Returned</span>
             {% else %}<span class="badge badge-transit">In Transit</span>{% endif %}
           </td>
           <td>
@@ -44,22 +61,22 @@
           </td>
         </tr>
         {% else %}
-        <tr class="empty-row"><td colspan="9">No shipments yet. Update an order status to "Shipped" to auto-create a shipment.</td></tr>
+        <tr class="empty-row"><td colspan="9">No active shipments found. Placing an order and marking as Shipped creates a shipment record.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
-<div style="background:#eff6ff;border-left:3px solid #2563eb;border-radius:8px;padding:14px 18px;font-size:13px;color:#1e40af">
-  <strong>Database triggers behind this page:</strong>
-  <code>trg_auto_shipment</code> creates the shipment when an order becomes <em>Shipped</em>;
-  <code>trg_prepare_shipment</code> assigns the tracking number and origin warehouse;
-  <code>trg_first_tracking_event</code> logs the first "Dispatched" checkpoint;
-  <code>trg_shipment_status_event</code> logs delivery/return and syncs the order status.
-</div>
-
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{{ url_for('static', filename='js/tracking.js') }}"></script>
 <script>SCWMS.initOverview('ship-map', {{ map_data|tojson }});</script>
+<script>
+document.getElementById('tableSearch')?.addEventListener('input', e => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(tr => {
+    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
+});
+</script>
 {% endblock %}

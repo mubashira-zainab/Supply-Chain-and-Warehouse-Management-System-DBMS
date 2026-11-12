@@ -1,10 +1,15 @@
 {% extends 'base.html' %}
 {% block title %}Suppliers{% endblock %}
-{% block page_title %}Suppliers{% endblock %}
+{% block page_title %}Supplier Management{% endblock %}
 {% block content %}
 
-<div class="page-actions">
-  <h2 style="font-size:14px;color:var(--color-text-muted);font-weight:500">{{ suppliers|length }} supplier(s) registered</h2>
+<div class="page-actions" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+  <div style="position:relative;width:280px">
+    <input type="text" id="tableSearch" class="form-input" placeholder="Search suppliers..." style="padding-left:34px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--color-text-muted);pointer-events:none">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  </div>
   <button class="btn btn-primary" onclick="openModal('addModal')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     Add Supplier
@@ -13,33 +18,68 @@
 
 <div class="card">
   <div class="table-wrapper">
-    <table>
+    <table id="dataTable">
       <thead>
-        <tr><th>#</th><th>Company Name</th><th>Contact</th><th>Email</th><th>Address</th><th>Action</th></tr>
+        <tr><th>ID</th><th>Company Name</th><th>Contact</th><th>Email</th><th>Address</th><th>Actions</th></tr>
       </thead>
       <tbody>
         {% for s in suppliers %}
         <tr>
-          <td class="td-muted">{{ s.supplier_id }}</td>
+          <td class="td-muted">#{{ s.supplier_id }}</td>
           <td class="fw-600">{{ s.name }}</td>
-          <td class="td-muted">{{ s.contact or '—' }}</td>
-          <td class="td-muted">{{ s.email or '—' }}</td>
+          <td>{{ s.contact or '—' }}</td>
+          <td>{{ s.email or '—' }}</td>
           <td class="td-muted">{{ s.address or '—' }}</td>
-          <td>
+          <td style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="openModal('editModal{{ s.supplier_id }}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Edit
+            </button>
             <a href="{{ url_for('delete_supplier', sid=s.supplier_id) }}"
                class="btn btn-ghost-danger btn-sm"
-               onclick="return confirm('Delete supplier: {{ s.name }}?')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3 6 5 6 21 6"/>
-                <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-                <path d="M10 11v6"/><path d="M14 11v6"/>
-              </svg>
+               onclick="return confirm('Are you sure you want to delete supplier {{ s.name }}?')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
               Delete
             </a>
           </td>
         </tr>
+
+        <!-- EDIT MODAL -->
+        <div class="modal-overlay" id="editModal{{ s.supplier_id }}">
+          <div class="modal">
+            <div class="modal-header">
+              <span class="modal-title">Edit Supplier #{{ s.supplier_id }}</span>
+              <button class="modal-close" onclick="closeModal('editModal{{ s.supplier_id }}')">&times;</button>
+            </div>
+            <form method="POST" action="{{ url_for('edit_supplier', sid=s.supplier_id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="modal-body">
+                <div class="form-group">
+                  <label class="form-label">Company Name *</label>
+                  <input type="text" name="name" class="form-input" value="{{ s.name }}" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Contact Number</label>
+                  <input type="text" name="contact" class="form-input" value="{{ s.contact or '' }}">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Email Address</label>
+                  <input type="email" name="email" class="form-input" value="{{ s.email or '' }}">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Address</label>
+                  <input type="text" name="address" class="form-input" value="{{ s.address or '' }}">
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('editModal{{ s.supplier_id }}')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Supplier</button>
+              </div>
+            </form>
+          </div>
+        </div>
         {% else %}
-        <tr class="empty-row"><td colspan="6">No suppliers registered yet.</td></tr>
+        <tr class="empty-row"><td colspan="6">No suppliers found.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -50,20 +90,15 @@
 <div class="modal-overlay" id="addModal">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Add Supplier
-      </span>
-      <button class="modal-close" onclick="closeModal('addModal')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      <span class="modal-title">Add New Supplier</span>
+      <button class="modal-close" onclick="closeModal('addModal')">&times;</button>
     </div>
     <form method="POST" action="{{ url_for('add_supplier') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">Company Name *</label>
-          <input type="text" name="name" class="form-input" required placeholder="e.g. National Foods Ltd">
+          <input type="text" name="name" class="form-input" required placeholder="e.g. National Logistics Ltd">
         </div>
         <div class="form-group">
           <label class="form-label">Contact Number</label>
@@ -71,11 +106,11 @@
         </div>
         <div class="form-group">
           <label class="form-label">Email Address</label>
-          <input type="email" name="email" class="form-input" placeholder="info@company.pk">
+          <input type="email" name="email" class="form-input" placeholder="info@supplier.com">
         </div>
         <div class="form-group">
           <label class="form-label">Address</label>
-          <input type="text" name="address" class="form-input" placeholder="City, Area">
+          <input type="text" name="address" class="form-input" placeholder="City, Region">
         </div>
       </div>
       <div class="modal-footer">
@@ -89,8 +124,14 @@
 <script>
 function openModal(id){ document.getElementById(id).classList.add('open'); }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.modal-overlay').forEach(function(el){
-  el.addEventListener('click', function(e){ if(e.target===el) el.classList.remove('open'); });
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if(e.target===el) el.classList.remove('open'); });
+});
+document.getElementById('tableSearch')?.addEventListener('input', e => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(tr => {
+    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
 });
 </script>
 {% endblock %}

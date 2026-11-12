@@ -1,10 +1,15 @@
 {% extends 'base.html' %}
 {% block title %}Products{% endblock %}
-{% block page_title %}Products{% endblock %}
+{% block page_title %}Product Catalog{% endblock %}
 {% block content %}
 
-<div class="page-actions">
-  <h2 style="font-size:14px;color:var(--color-text-muted);font-weight:500">{{ products|length }} product(s) in catalog</h2>
+<div class="page-actions" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+  <div style="position:relative;width:280px">
+    <input type="text" id="tableSearch" class="form-input" placeholder="Search products..." style="padding-left:34px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--color-text-muted);pointer-events:none">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  </div>
   <button class="btn btn-primary" onclick="openModal('addModal')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     Add Product
@@ -13,32 +18,74 @@
 
 <div class="card">
   <div class="table-wrapper">
-    <table>
+    <table id="dataTable">
       <thead>
-        <tr><th>#</th><th>Product Name</th><th>Category</th><th>Price (Rs.)</th><th>Supplier</th><th>Action</th></tr>
+        <tr><th>ID</th><th>Product Name</th><th>Category</th><th>Unit Price</th><th>Supplier</th><th>Actions</th></tr>
       </thead>
       <tbody>
         {% for p in products %}
         <tr>
-          <td class="td-muted">{{ p.product_id }}</td>
+          <td class="td-muted">#{{ p.product_id }}</td>
           <td class="fw-600">{{ p.product_name }}</td>
-          <td><span class="badge badge-secondary">{{ p.category or '—' }}</span></td>
-          <td class="fw-600">Rs. {{ "{:,.0f}".format(p.price) }}</td>
-          <td class="td-muted">{{ p.supplier_name }}</td>
-          <td>
+          <td><span class="badge badge-info">{{ p.category or 'General' }}</span></td>
+          <td class="fw-700">Rs. {{ "{:,.0f}".format(p.price) }}</td>
+          <td>{{ p.supplier_name or '—' }}</td>
+          <td style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="openModal('editModal{{ p.product_id }}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Edit
+            </button>
             <a href="{{ url_for('delete_product', pid=p.product_id) }}"
                class="btn btn-ghost-danger btn-sm"
-               onclick="return confirm('Delete product: {{ p.product_name }}?')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3 6 5 6 21 6"/>
-                <path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-              </svg>
+               onclick="return confirm('Delete product {{ p.product_name }}?')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
               Delete
             </a>
           </td>
         </tr>
+
+        <!-- EDIT MODAL -->
+        <div class="modal-overlay" id="editModal{{ p.product_id }}">
+          <div class="modal">
+            <div class="modal-header">
+              <span class="modal-title">Edit Product #{{ p.product_id }}</span>
+              <button class="modal-close" onclick="closeModal('editModal{{ p.product_id }}')">&times;</button>
+            </div>
+            <form method="POST" action="{{ url_for('edit_product', pid=p.product_id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="modal-body">
+                <div class="form-group">
+                  <label class="form-label">Product Name *</label>
+                  <input type="text" name="product_name" class="form-input" value="{{ p.product_name }}" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Category</label>
+                  <input type="text" name="category" class="form-input" value="{{ p.category or '' }}">
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Price (PKR) *</label>
+                  <input type="number" step="0.01" name="price" class="form-input" value="{{ p.price }}" required>
+                </div>
+                <div class="form-group">
+                  <label class="form-label">Supplier</label>
+                  <select name="supplier_id" class="form-select">
+                    {% for s in suppliers %}
+                    <option value="{{ s.supplier_id }}" {% if s.supplier_id == p.supplier_id %}selected{% endif %}>
+                      {{ s.name }}
+                    </option>
+                    {% endfor %}
+                  </select>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('editModal{{ p.product_id }}')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Product</button>
+              </div>
+            </form>
+          </div>
+        </div>
         {% else %}
-        <tr class="empty-row"><td colspan="6">No products added yet.</td></tr>
+        <tr class="empty-row"><td colspan="6">No products found.</td></tr>
         {% endfor %}
       </tbody>
     </table>
@@ -49,33 +96,27 @@
 <div class="modal-overlay" id="addModal">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Add Product
-      </span>
-      <button class="modal-close" onclick="closeModal('addModal')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      <span class="modal-title">Add New Product</span>
+      <button class="modal-close" onclick="closeModal('addModal')">&times;</button>
     </div>
     <form method="POST" action="{{ url_for('add_product') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
           <label class="form-label">Product Name *</label>
-          <input type="text" name="product_name" class="form-input" required placeholder="e.g. Basmati Rice 5kg">
+          <input type="text" name="product_name" class="form-input" required placeholder="e.g. Canola Oil 5L">
         </div>
         <div class="form-group">
           <label class="form-label">Category</label>
-          <input type="text" name="category" class="form-input" placeholder="e.g. Grains, Dairy, Beverages">
+          <input type="text" name="category" class="form-input" placeholder="e.g. Cooking Oil">
         </div>
         <div class="form-group">
-          <label class="form-label">Price (Rs.) *</label>
-          <input type="number" name="price" class="form-input" step="0.01" min="0" required placeholder="0.00">
+          <label class="form-label">Price (PKR) *</label>
+          <input type="number" step="0.01" name="price" class="form-input" required placeholder="0.00">
         </div>
         <div class="form-group">
-          <label class="form-label">Supplier *</label>
-          <select name="supplier_id" class="form-select" required>
-            <option value="">-- Select Supplier --</option>
+          <label class="form-label">Supplier</label>
+          <select name="supplier_id" class="form-select">
             {% for s in suppliers %}
             <option value="{{ s.supplier_id }}">{{ s.name }}</option>
             {% endfor %}
@@ -93,8 +134,14 @@
 <script>
 function openModal(id){ document.getElementById(id).classList.add('open'); }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.modal-overlay').forEach(function(el){
-  el.addEventListener('click', function(e){ if(e.target===el) el.classList.remove('open'); });
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if(e.target===el) el.classList.remove('open'); });
+});
+document.getElementById('tableSearch')?.addEventListener('input', e => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(tr => {
+    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
 });
 </script>
 {% endblock %}

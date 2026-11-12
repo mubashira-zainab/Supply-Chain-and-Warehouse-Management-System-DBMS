@@ -1,10 +1,15 @@
 {% extends 'base.html' %}
 {% block title %}Warehouses{% endblock %}
-{% block page_title %}Warehouses{% endblock %}
+{% block page_title %}Warehouse Facilities{% endblock %}
 {% block content %}
 
-<div class="page-actions">
-  <h2 style="font-size:14px;color:var(--color-text-muted);font-weight:500">{{ warehouses|length }} warehouse(s) registered</h2>
+<div class="page-actions" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:10px">
+  <div style="position:relative;width:280px">
+    <input type="text" id="tableSearch" class="form-input" placeholder="Search warehouses..." style="padding-left:34px">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--color-text-muted);pointer-events:none">
+      <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+    </svg>
+  </div>
   <button class="btn btn-primary" onclick="openModal('addModal')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
     Add Warehouse
@@ -13,59 +18,93 @@
 
 <div class="card">
   <div class="table-wrapper">
-    <table>
-      <thead><tr><th>#</th><th>Location</th><th>Action</th></tr></thead>
+    <table id="dataTable">
+      <thead>
+        <tr><th>ID</th><th>Facility Location</th><th>Map Coordinates</th><th>Tracking Status</th><th>Actions</th></tr>
+      </thead>
       <tbody>
         {% for w in warehouses %}
         <tr>
-          <td class="td-muted">{{ w.warehouse_id }}</td>
-          <td class="fw-600">
-            <svg style="width:14px;height:14px;color:#dc2626;vertical-align:middle;margin-right:6px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z"/><circle cx="12" cy="10" r="3"/>
-            </svg>
-            {{ w.location }}
+          <td class="td-muted">#{{ w.warehouse_id }}</td>
+          <td class="fw-600">{{ w.location }}</td>
+          <td>
+            {% if w.latitude and w.longitude %}
+              <span class="td-muted" style="font-size:12px">{{ "%.4f"|format(w.latitude) }}, {{ "%.4f"|format(w.longitude) }}</span>
+            {% else %}
+              <span class="badge badge-warning" style="font-size:10px">Not Mapped</span>
+            {% endif %}
           </td>
           <td>
+            {% if w.latitude %}
+              <span class="badge badge-success">Active on Map</span>
+            {% else %}
+              <span class="badge badge-secondary">Pending Geo</span>
+            {% endif %}
+          </td>
+          <td style="display:flex;gap:6px">
+            <button class="btn btn-outline btn-sm" onclick="openModal('editModal{{ w.warehouse_id }}')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              Edit
+            </button>
             <a href="{{ url_for('delete_warehouse', wid=w.warehouse_id) }}"
                class="btn btn-ghost-danger btn-sm"
-               onclick="return confirm('Delete warehouse: {{ w.location }}?')">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/>
-              </svg>
+               onclick="return confirm('Delete warehouse {{ w.location }}?')">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg>
               Delete
             </a>
           </td>
         </tr>
+
+        <!-- EDIT MODAL -->
+        <div class="modal-overlay" id="editModal{{ w.warehouse_id }}">
+          <div class="modal">
+            <div class="modal-header">
+              <span class="modal-title">Edit Warehouse #{{ w.warehouse_id }}</span>
+              <button class="modal-close" onclick="closeModal('editModal{{ w.warehouse_id }}')">&times;</button>
+            </div>
+            <form method="POST" action="{{ url_for('edit_warehouse', wid=w.warehouse_id) }}">
+              <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+              <div class="modal-body">
+                <div class="form-group">
+                  <label class="form-label">Location (City) *</label>
+                  <input type="text" name="location" class="form-input" value="{{ w.location }}" required>
+                  <div class="form-hint">E.g. Karachi Hub, Lahore Central, Multan Port</div>
+                </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-outline" onclick="closeModal('editModal{{ w.warehouse_id }}')">Cancel</button>
+                <button type="submit" class="btn btn-primary">Update Warehouse</button>
+              </div>
+            </form>
+          </div>
+        </div>
         {% else %}
-        <tr class="empty-row"><td colspan="3">No warehouses registered yet.</td></tr>
+        <tr class="empty-row"><td colspan="5">No warehouses configured.</td></tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
 </div>
 
+<!-- ADD MODAL -->
 <div class="modal-overlay" id="addModal">
   <div class="modal">
     <div class="modal-header">
-      <span class="modal-title">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Add Warehouse
-      </span>
-      <button class="modal-close" onclick="closeModal('addModal')">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
+      <span class="modal-title">Add New Warehouse</span>
+      <button class="modal-close" onclick="closeModal('addModal')">&times;</button>
     </div>
     <form method="POST" action="{{ url_for('add_warehouse') }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
       <div class="modal-body">
         <div class="form-group">
-          <label class="form-label">Location / Name *</label>
-          <input type="text" name="location" class="form-input" required placeholder="e.g. Multan Central Warehouse">
+          <label class="form-label">City / Location Name *</label>
+          <input type="text" name="location" class="form-input" required placeholder="e.g. Islamabad Logistics Hub">
+          <div class="form-hint">Coordinates are resolved automatically for recognized cities.</div>
         </div>
       </div>
       <div class="modal-footer">
         <button type="button" class="btn btn-outline" onclick="closeModal('addModal')">Cancel</button>
-        <button type="submit" class="btn btn-primary">Save Warehouse</button>
+        <button type="submit" class="btn btn-primary">Save Facility</button>
       </div>
     </form>
   </div>
@@ -74,8 +113,14 @@
 <script>
 function openModal(id){ document.getElementById(id).classList.add('open'); }
 function closeModal(id){ document.getElementById(id).classList.remove('open'); }
-document.querySelectorAll('.modal-overlay').forEach(function(el){
-  el.addEventListener('click', function(e){ if(e.target===el) el.classList.remove('open'); });
+document.querySelectorAll('.modal-overlay').forEach(el => {
+  el.addEventListener('click', e => { if(e.target===el) el.classList.remove('open'); });
+});
+document.getElementById('tableSearch')?.addEventListener('input', e => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('#dataTable tbody tr:not(.empty-row)').forEach(tr => {
+    tr.style.display = tr.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
 });
 </script>
 {% endblock %}
