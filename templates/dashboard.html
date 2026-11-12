@@ -1,330 +1,496 @@
 {% extends 'base.html' %}
 {% block title %}Dashboard{% endblock %}
-{% block page_title %}Dashboard{% endblock %}
+{% block page_title %}
+  <span class="live-dot"></span> Live Dashboard
+{% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <style>
-/* ── COMPACT DASHBOARD ── */
-.dash-kpi-row {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
-}
-.dash-kpi {
-  background: #fff;
-  border: 1px solid var(--color-border);
-  border-radius: 10px;
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  box-shadow: var(--shadow-sm);
-  transition: box-shadow .2s, transform .2s;
-}
-.dash-kpi:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
-.dash-kpi-icon {
-  width: 32px; height: 32px;
-  border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-}
-.dash-kpi-icon svg { width: 16px; height: 16px; }
-.dash-kpi-num   { font-size: 22px; font-weight: 800; color: var(--color-text); line-height: 1; }
-.dash-kpi-label { font-size: 11px; color: var(--color-text-muted); font-weight: 500; }
+/* ── DASHBOARD SPECIFIC ── */
+.dash-row-shipments { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; margin-bottom: 16px; }
+.dash-row-mid       { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; margin-bottom: 16px; }
+.dash-row-bottom    { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
 
-.dash-charts-row {
-  display: grid;
-  grid-template-columns: 1fr 1.4fr;
-  gap: 16px;
-  margin-bottom: 16px;
+@media (max-width:1200px) {
+  .dash-row-shipments { grid-template-columns: 1fr; }
+  .dash-row-mid       { grid-template-columns: 1fr; }
+  .dash-row-bottom    { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width:640px) {
+  .dash-row-bottom { grid-template-columns: 1fr; }
 }
 
-.dash-bottom-row {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.refresh-dot {
-  display: inline-block;
-  width: 7px; height: 7px;
-  background: #10b981;
-  border-radius: 50%;
-  margin-right: 5px;
-  animation: pulse 2s infinite;
-}
-@keyframes pulse {
-  0%,100% { opacity:1; }
-  50%      { opacity:.4; }
-}
-@media (max-width: 1100px) {
-  .dash-kpi-row { grid-template-columns: repeat(4, 1fr); }
-  .dash-charts-row, .dash-bottom-row { grid-template-columns: 1fr; }
-}
+/* Funnel chart */
+.funnel-wrap { padding: 10px 16px 16px; }
+.funnel-row  { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.funnel-label { width: 80px; font-size: 12px; font-weight: 600; color: var(--color-text); flex-shrink: 0; }
+.funnel-bar-wrap { flex: 1; display: flex; align-items: center; gap: 8px; }
+.funnel-bar  { height: 24px; border-radius: 4px; transition: width .6s ease; }
+.funnel-val  { font-size: 12px; font-weight: 700; color: var(--color-text); }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<!-- KPI STRIP -->
-<div class="dash-kpi-row">
+<!-- ══ KPI STRIP ══ -->
+<div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
 
-  <div class="dash-kpi">
-    <div class="dash-kpi-icon" style="background:#eff6ff;color:#2563eb">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
-        <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
-      </svg>
+  <div class="kpi-card">
+    <div class="kpi-card-top">
+      <div class="kpi-icon" style="background:#eff6ff;color:#2563eb">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+          <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+        </svg>
+      </div>
+      <span class="kpi-change up">Live</span>
     </div>
-    <div class="dash-kpi-num" id="kpi-suppliers">{{ stats.suppliers }}</div>
-    <div class="dash-kpi-label">Suppliers</div>
+    <div class="kpi-num" id="kpi-shipments">{{ stats.shipments }}</div>
+    <div class="kpi-label">Total Shipments</div>
   </div>
 
-  <div class="dash-kpi">
-    <div class="dash-kpi-icon" style="background:#f5f3ff;color:#7c3aed">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>
-      </svg>
+  <div class="kpi-card">
+    <div class="kpi-card-top">
+      <div class="kpi-icon" style="background:#ecfeff;color:#0891b2">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+      </div>
+      <span class="kpi-change up">Active</span>
     </div>
-    <div class="dash-kpi-num" id="kpi-products">{{ stats.products }}</div>
-    <div class="dash-kpi-label">Products</div>
+    <div class="kpi-num" id="kpi-transit">{{ stats.in_transit }}</div>
+    <div class="kpi-label">In Transit</div>
   </div>
 
-  <div class="dash-kpi">
-    <div class="dash-kpi-icon" style="background:#fffbeb;color:#d97706">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
-        <line x1="3" y1="6" x2="21" y2="6"/>
-      </svg>
-    </div>
-    <div class="dash-kpi-num" id="kpi-orders">{{ stats.orders }}</div>
-    <div class="dash-kpi-label">Total Orders</div>
-  </div>
-
-  <div class="dash-kpi">
-    <div class="dash-kpi-icon" style="background:#ecfeff;color:#0891b2">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
-        <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
-      </svg>
-    </div>
-    <div class="dash-kpi-num" id="kpi-shipments">{{ stats.shipments }}</div>
-    <div class="dash-kpi-label">Shipments</div>
-  </div>
-
-  <div class="dash-kpi">
-    <div class="dash-kpi-icon" style="background:#fef2f2;color:#dc2626">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
-      </svg>
-    </div>
-    <div class="dash-kpi-num" id="kpi-low-stock">{{ stats.low_stock }}</div>
-    <div class="dash-kpi-label">Low Stock</div>
-  </div>
-
-  <div class="dash-kpi">
-    <div class="dash-kpi-icon" style="background:#fffbeb;color:#d97706">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-      </svg>
-    </div>
-    <div class="dash-kpi-num" id="kpi-pending">{{ stats.pending }}</div>
-    <div class="dash-kpi-label">Pending</div>
-  </div>
-
-  <div class="dash-kpi">
-    <div class="dash-kpi-icon" style="background:#f0fdf4;color:#16a34a">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-      </svg>
-    </div>
-    <div class="dash-kpi-num" id="kpi-transit">{{ stats.in_transit }}</div>
-    <div class="dash-kpi-label">In Transit</div>
-  </div>
-
-</div>
-
-<!-- CHARTS ROW -->
-<div class="dash-charts-row">
-
-  <div class="card">
-    <div class="card-header" style="font-size:12.5px;padding:12px 16px">
-      <span class="refresh-dot"></span> Order Status
-      <span id="lastUpdate" style="margin-left:auto;font-size:11px;font-weight:400;color:var(--color-text-muted)">Live</span>
-    </div>
-    <div class="card-body" style="padding:16px">
-      <canvas id="statusChart" height="180"></canvas>
-    </div>
-  </div>
-
-  <div class="card">
-    <div class="card-header" style="font-size:12.5px;padding:12px 16px">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/>
-        <polyline points="9 22 9 12 15 12 15 22"/>
-      </svg>
-      Stock by Warehouse
-    </div>
-    <div class="card-body" style="padding:16px">
-      <canvas id="warehouseChart" height="180"></canvas>
-    </div>
-  </div>
-
-</div>
-
-<!-- MAP + TABLES ROW -->
-<div class="dash-bottom-row">
-
-  <!-- MAP -->
-  <div class="card">
-    <div class="card-header" style="font-size:12.5px;padding:12px 16px">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polygon points="3 11 22 2 13 21 11 13 3 11"/>
-      </svg>
-      Live Shipments Map
-      <a href="{{ url_for('shipments') }}" style="margin-left:auto;font-size:11px;color:var(--color-primary);text-decoration:none;font-weight:500">
-        {{ stats.in_transit }} in transit →
-      </a>
-    </div>
-    <div class="card-body" style="padding:12px">
-      <div id="dash-map" style="height:260px;border-radius:8px;border:1px solid var(--color-border)"></div>
-    </div>
-  </div>
-
-  <!-- SIDE TABLES -->
-  <div style="display:flex;flex-direction:column;gap:16px">
-
-    <!-- RECENT ORDERS -->
-    <div class="card">
-      <div class="card-header" style="font-size:12.5px;padding:12px 16px">
+  <div class="kpi-card">
+    <div class="kpi-card-top">
+      <div class="kpi-icon" style="background:#fffbeb;color:#d97706">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
           <line x1="3" y1="6" x2="21" y2="6"/>
         </svg>
-        Recent Orders
       </div>
-      <div class="table-wrapper">
-        <table style="font-size:12.5px">
-          <thead>
-            <tr><th>Customer</th><th>Product</th><th>Status</th></tr>
-          </thead>
-          <tbody>
-            {% for o in recent_orders %}
-            <tr>
-              <td class="fw-600" style="padding:9px 14px">{{ o.customer_name }}</td>
-              <td style="padding:9px 14px;color:var(--color-text-muted)">{{ o.product_name }}</td>
-              <td style="padding:9px 14px">
-                <span class="badge badge-{{ o.status|lower }}" style="font-size:10.5px">{{ o.status }}</span>
-              </td>
-            </tr>
-            {% else %}
-            <tr class="empty-row"><td colspan="3">No orders yet.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+      <span class="kpi-change {% if stats.pending > 5 %}down{% else %}up{% endif %}">
+        {{ stats.pending }} new
+      </span>
     </div>
+    <div class="kpi-num" id="kpi-orders">{{ stats.orders }}</div>
+    <div class="kpi-label">Total Orders</div>
+  </div>
 
-    <!-- LOW STOCK -->
-    <div class="card">
-      <div class="card-header" style="font-size:12.5px;padding:12px 16px;color:#dc2626">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:#dc2626">
+  <div class="kpi-card">
+    <div class="kpi-card-top">
+      <div class="kpi-icon" style="background:#fef2f2;color:#dc2626">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
           <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
         </svg>
-        Low Stock Alert
-        {% if stats.low_stock > 0 %}
-          <span class="badge badge-danger" style="margin-left:auto;font-size:10.5px">{{ stats.low_stock }}</span>
-        {% endif %}
       </div>
-      <div class="table-wrapper">
-        <table style="font-size:12.5px">
-          <thead>
-            <tr><th>Product</th><th>Warehouse</th><th>Qty</th></tr>
-          </thead>
-          <tbody>
-            {% for s in low_stock %}
-            <tr>
-              <td class="fw-600" style="padding:9px 14px">{{ s.product_name }}</td>
-              <td style="padding:9px 14px;color:var(--color-text-muted)">{{ s.warehouse }}</td>
-              <td style="padding:9px 14px">
-                <span class="badge badge-danger" style="font-size:10.5px">{{ s.quantity }}</span>
-              </td>
-            </tr>
-            {% else %}
-            <tr class="empty-row"><td colspan="3">All healthy.</td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <span class="kpi-change {% if stats.low_stock > 0 %}down{% else %}up{% endif %}">
+        {% if stats.low_stock > 0 %}Alert{% else %}OK{% endif %}
+      </span>
+    </div>
+    <div class="kpi-num" id="kpi-low-stock">{{ stats.low_stock }}</div>
+    <div class="kpi-label">Low Stock</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-card-top">
+      <div class="kpi-icon" style="background:#f5f3ff;color:#7c3aed">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
+        </svg>
+      </div>
+      <span class="kpi-change up">Registered</span>
+    </div>
+    <div class="kpi-num" id="kpi-suppliers">{{ stats.suppliers }}</div>
+    <div class="kpi-label">Suppliers</div>
+  </div>
+
+</div>
+
+<!-- ══ SHIPMENTS PIPELINE + MAP ══ -->
+<div class="dash-row-shipments">
+
+  <!-- Shipments Pipeline -->
+  <div class="card">
+    <div class="card-header">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
+        <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
+      </svg>
+      Shipments Pipeline
+      <a href="{{ url_for('shipments') }}" style="margin-left:auto;font-size:11.5px;color:var(--color-primary);font-weight:600">View All</a>
+    </div>
+    <div class="card-body" style="padding:12px">
+      <div class="ship-pipeline">
+
+        <!-- Pending -->
+        <div class="ship-col">
+          <div class="ship-col-header" style="background:#f59e0b">
+            Pending
+            <span class="count">{{ stats.pending }}</span>
+          </div>
+          {% for o in recent_orders if o.status == 'Pending' %}
+          <div class="ship-item">
+            <div class="ship-dot" style="background:#f59e0b"></div>
+            <div>
+              <div class="ship-id">#{{ o.order_id }}</div>
+              <div class="ship-name">{{ o.customer_name|truncate(14,true,'') }}</div>
+            </div>
+          </div>
+          {% else %}
+          <div class="ship-empty">None</div>
+          {% endfor %}
+        </div>
+
+        <!-- Processing -->
+        <div class="ship-col">
+          <div class="ship-col-header" style="background:#3b82f6">
+            Processing
+            <span class="count">{{ shipment_counts.get('Processing', 0) }}</span>
+          </div>
+          {% for o in recent_orders if o.status == 'Processing' %}
+          <div class="ship-item">
+            <div class="ship-dot" style="background:#3b82f6"></div>
+            <div>
+              <div class="ship-id">#{{ o.order_id }}</div>
+              <div class="ship-name">{{ o.customer_name|truncate(14,true,'') }}</div>
+            </div>
+          </div>
+          {% else %}
+          <div class="ship-empty">None</div>
+          {% endfor %}
+        </div>
+
+        <!-- Shipped / In Transit -->
+        <div class="ship-col">
+          <div class="ship-col-header" style="background:#06b6d4">
+            In Transit
+            <span class="count">{{ stats.in_transit }}</span>
+          </div>
+          {% for s in transit_shipments[:3] %}
+          <div class="ship-item">
+            <div class="ship-dot" style="background:#06b6d4"></div>
+            <div>
+              <div class="ship-id">#{{ s.shipment_id }}</div>
+              <div class="ship-name">{{ s.origin|truncate(10,true,'') }} → {{ s.destination|truncate(10,true,'') }}</div>
+            </div>
+          </div>
+          {% else %}
+          <div class="ship-empty">None</div>
+          {% endfor %}
+        </div>
+
+        <!-- Delivered -->
+        <div class="ship-col">
+          <div class="ship-col-header" style="background:#10b981">
+            Delivered
+            <span class="count">{{ shipment_counts.get('Delivered', 0) }}</span>
+          </div>
+          {% for o in recent_orders if o.status == 'Delivered' %}
+          <div class="ship-item">
+            <div class="ship-dot" style="background:#10b981"></div>
+            <div>
+              <div class="ship-id">#{{ o.order_id }}</div>
+              <div class="ship-name">{{ o.customer_name|truncate(14,true,'') }}</div>
+            </div>
+          </div>
+          {% else %}
+          <div class="ship-empty">None</div>
+          {% endfor %}
+        </div>
+
+        <!-- Cancelled -->
+        <div class="ship-col">
+          <div class="ship-col-header" style="background:#ef4444">
+            Cancelled
+            <span class="count">{{ shipment_counts.get('Cancelled', 0) }}</span>
+          </div>
+          {% for o in recent_orders if o.status == 'Cancelled' %}
+          <div class="ship-item">
+            <div class="ship-dot" style="background:#ef4444"></div>
+            <div>
+              <div class="ship-id">#{{ o.order_id }}</div>
+              <div class="ship-name">{{ o.customer_name|truncate(14,true,'') }}</div>
+            </div>
+          </div>
+          {% else %}
+          <div class="ship-empty">None</div>
+          {% endfor %}
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Map & Tracking -->
+  <div class="card">
+    <div class="card-header">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polygon points="3 11 22 2 13 21 11 13 3 11"/>
+      </svg>
+      Map & Tracking
+      <span style="margin-left:auto;font-size:11px;color:var(--color-text-muted)">
+        <span class="live-dot"></span>{{ stats.in_transit }} active
+      </span>
+    </div>
+    <div class="card-body" style="padding:10px">
+      <div id="dash-map" style="height:240px;border-radius:8px;border:1px solid var(--color-border)"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ══ CHARTS ROW ══ -->
+<div class="dash-row-mid">
+
+  <!-- Left: Order Status Donut + On-Time Line -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+
+    <div class="card">
+      <div class="card-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        Transport Utilization
+        <span style="margin-left:auto" id="lastUpdate" style="font-size:11px;color:var(--color-text-muted)"></span>
+      </div>
+      <div class="card-body" style="padding:12px">
+        <canvas id="statusChart" height="160"></canvas>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        On-Time Performance
+      </div>
+      <div class="card-body" style="padding:12px">
+        <canvas id="perfChart" height="140"></canvas>
       </div>
     </div>
 
   </div>
+
+  <!-- Right: Quotes Funnel + Warehouse Bar -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+
+    <div class="card">
+      <div class="card-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+        </svg>
+        Quotes Pipeline
+      </div>
+      <div class="funnel-wrap">
+        {% set funnel = [
+          ('Pending',    stats.pending,    '#f59e0b', 100),
+          ('Processing', shipment_counts.get('Processing',0), '#3b82f6', 75),
+          ('In Transit', stats.in_transit, '#06b6d4', 55),
+          ('Delivered',  shipment_counts.get('Delivered',0),  '#10b981', 35),
+          ('Cancelled',  shipment_counts.get('Cancelled',0),  '#ef4444', 20)
+        ] %}
+        {% for label, val, color, pct in funnel %}
+        <div class="funnel-row">
+          <div class="funnel-label">{{ label }}</div>
+          <div class="funnel-bar-wrap">
+            <div class="funnel-bar" style="background:{{ color }};width:{{ pct }}%;opacity:.85"></div>
+            <div class="funnel-val">{{ val }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        Stock by Warehouse
+      </div>
+      <div class="card-body" style="padding:12px">
+        <canvas id="warehouseChart" height="140"></canvas>
+      </div>
+    </div>
+
+  </div>
+
 </div>
 
+<!-- ══ BOTTOM ROW: Activity + Low Stock + Integration Health ══ -->
+<div class="dash-row-bottom">
+
+  <!-- Recent Activities -->
+  <div class="card" style="grid-column: span 2">
+    <div class="card-header">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+      </svg>
+      Recent Activities
+    </div>
+    <div class="activity-feed">
+      {% for o in recent_orders %}
+      <div class="activity-item">
+        <div class="activity-dot" style="background:{% if o.status=='Delivered' %}#10b981{% elif o.status=='Cancelled' %}#ef4444{% elif o.status=='Pending' %}#f59e0b{% else %}#3b82f6{% endif %}"></div>
+        <div class="activity-text">
+          Order <span>#{{ o.order_id }}</span> from <span>{{ o.customer_name }}</span>
+          — {{ o.product_name }}
+          <span class="badge badge-{{ o.status|lower }}" style="margin-left:6px;font-size:10px">{{ o.status }}</span>
+        </div>
+        <div class="activity-time">Recent</div>
+      </div>
+      {% else %}
+      <div style="padding:20px;text-align:center;color:var(--color-text-light);font-size:13px">No recent orders.</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- Low Stock -->
+  <div class="card">
+    <div class="card-header" style="color:{% if stats.low_stock > 0 %}#dc2626{% else %}inherit{% endif %}">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+      </svg>
+      Low Stock Alert
+      {% if stats.low_stock > 0 %}
+        <span class="badge badge-danger" style="margin-left:auto">{{ stats.low_stock }}</span>
+      {% endif %}
+    </div>
+    <div class="table-wrapper">
+      <table style="font-size:12px">
+        <thead><tr><th>Product</th><th>Warehouse</th><th>Qty</th></tr></thead>
+        <tbody>
+          {% for s in low_stock %}
+          <tr>
+            <td class="fw-600" style="padding:8px 14px">{{ s.product_name }}</td>
+            <td style="padding:8px 14px;color:var(--color-text-muted)">{{ s.warehouse }}</td>
+            <td style="padding:8px 14px"><span class="badge badge-danger">{{ s.quantity }}</span></td>
+          </tr>
+          {% else %}
+          <tr class="empty-row"><td colspan="3">All stock healthy.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Integration Health -->
+  <div class="card">
+    <div class="card-header">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+      </svg>
+      System Health
+    </div>
+    <div class="integration-list">
+      {% set health = [
+        ('Database',  '#10b981', 98),
+        ('Shipments', '#3b82f6', 94),
+        ('Inventory', '#f59e0b', 87),
+        ('Orders',    '#8b5cf6', 92),
+        ('AI Module', '#06b6d4', 85),
+      ] %}
+      {% for name, color, pct in health %}
+      <div class="integration-item">
+        <div class="integration-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="{{ color }}" stroke-width="2">
+            <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2"/>
+          </svg>
+        </div>
+        <div class="integration-info">
+          <div class="integration-name">{{ name }}</div>
+          <div class="integration-bar-wrap">
+            <div class="integration-bar">
+              <div class="integration-bar-fill" style="width:{{ pct }}%;background:{{ color }}"></div>
+            </div>
+            <span class="integration-pct">{{ pct }}%</span>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+</div>
+
+<!-- Map + Charts Scripts -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{{ url_for('static', filename='js/tracking.js') }}"></script>
 <script>SCWMS.initOverview('dash-map', {{ map_data|tojson }});</script>
 
 <script>
 (function(){
-  const GRID = 'rgba(100,116,139,.1)';
-  const TEXT = '#94a3b8';
-  Chart.defaults.color      = TEXT;
+  const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
+  const GRID = () => isDark() ? 'rgba(255,255,255,.07)' : 'rgba(100,116,139,.1)';
+  const TEXT = () => isDark() ? '#94a3b8' : '#64748b';
+
   Chart.defaults.font.family = 'Inter, sans-serif';
   Chart.defaults.font.size   = 11;
 
-  const SC = {'Pending':'#f59e0b','Processing':'#3b82f6','Shipped':'#06b6d4','Delivered':'#10b981','Cancelled':'#ef4444'};
+  const SC = {'Pending':'#f59e0b','Processing':'#3b82f6','Shipped':'#06b6d4','Delivered':'#10b981','Cancelled':'#ef4444','In Transit':'#06b6d4'};
 
+  /* Donut */
   const sDough = new Chart(document.getElementById('statusChart'), {
     type: 'doughnut',
-    data: { labels:[], datasets:[{ data:[], backgroundColor:[], borderWidth:2, borderColor:'#fff', hoverOffset:4 }] },
+    data: { labels:[], datasets:[{ data:[], backgroundColor:[], borderWidth:2, borderColor:'transparent', hoverOffset:4 }] },
     options: {
-      responsive:true, cutout:'68%',
-      plugins:{
-        legend:{ position:'bottom', labels:{ padding:12, usePointStyle:true, font:{size:11} } }
+      responsive:true, cutout:'65%',
+      plugins:{ legend:{ position:'bottom', labels:{ padding:10, usePointStyle:true } } }
+    }
+  });
+
+  /* Line — On-Time Performance */
+  const perf = new Chart(document.getElementById('perfChart'), {
+    type:'line',
+    data:{ labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+           datasets:[{ label:'On-Time %', data:[88,92,87,95,91,96,93],
+             borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,.12)',
+             tension:.4, fill:true, pointRadius:3 }] },
+    options:{ responsive:true,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ grid:{ display:false } },
+        y:{ min:70, max:100, grid:{ color: GRID() }, ticks:{ callback: v => v+'%' } }
       }
     }
   });
 
+  /* Bar — Warehouse */
   const wBar = new Chart(document.getElementById('warehouseChart'), {
-    type: 'bar',
-    data: { labels:[], datasets:[{
+    type:'bar',
+    data:{ labels:[], datasets:[{
       label:'Units', data:[],
-      backgroundColor: ['#3b82f6','#06b6d4','#8b5cf6','#f59e0b','#10b981'],
+      backgroundColor:['#3b82f6','#06b6d4','#8b5cf6','#f59e0b','#10b981'],
       borderRadius:5, borderSkipped:false
     }]},
     options:{
       responsive:true,
       plugins:{ legend:{ display:false } },
       scales:{
-        x:{ grid:{ display:false }, ticks:{font:{size:10}} },
-        y:{ grid:{ color:GRID }, beginAtZero:true, ticks:{font:{size:10}} }
+        x:{ grid:{ display:false } },
+        y:{ grid:{ color: GRID() }, beginAtZero:true }
       }
     }
   });
 
   const kMap = {
-    suppliers:'kpi-suppliers', products:'kpi-products', orders:'kpi-orders',
-    shipments:'kpi-shipments', low_stock:'kpi-low-stock',
-    pending:'kpi-pending', in_transit:'kpi-transit'
+    shipments:'kpi-shipments', in_transit:'kpi-transit',
+    orders:'kpi-orders', low_stock:'kpi-low-stock', suppliers:'kpi-suppliers'
   };
 
   function animNum(el, to){
-    const from = parseInt(el.textContent)||0;
+    const from=parseInt(el.textContent)||0;
     if(from===to) return;
-    const d = to>from?1:-1, step=Math.ceil(Math.abs(to-from)/6);
+    const d=to>from?1:-1, step=Math.max(1,Math.ceil(Math.abs(to-from)/6));
     let v=from;
-    const t=setInterval(()=>{
-      v+=d*step;
-      if((d>0&&v>=to)||(d<0&&v<=to)){v=to;clearInterval(t);}
-      el.textContent=v;
-    },40);
+    const t=setInterval(()=>{ v+=d*step; if((d>0&&v>=to)||(d<0&&v<=to)){v=to;clearInterval(t);} el.textContent=v; },40);
   }
 
   function refresh(){

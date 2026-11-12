@@ -1,7 +1,10 @@
 from flask import (Flask, render_template, request, redirect,
                    url_for, session, flash, jsonify, abort)
-from werkzeug.security import check_password_hash
-from datetime import date, timedelta
+from werkzeug.security import check_password_hash, generate_password_hash
+from datetime import date, timedelta, datetime
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+import smtplib
 from functools import wraps
 import hmac
 import math
@@ -15,10 +18,8 @@ import geo
 from config import get_db
 
 # ─────────────────────────────────────────────────────────────
-#  Supply Chain & Warehouse Management System
-#  Student:    Mubashira Zainab | BS Mathematics 5th Semester
-#  University: CASPAM, BZU Multan
-#  Course:     DBMS (COMP351) | Supervisor: Dr. Imran Javaid
+#  SC&WMS — Enterprise Supply Chain & Warehouse Management
+#  Enterprise Logistics & Multi-Warehouse Operations Platform
 # ─────────────────────────────────────────────────────────────
 
 # static files live in public/static so Vercel's CDN can serve them directly
@@ -120,28 +121,275 @@ def server_error(e):
                            message='Internal server error.'), 500
 
 # ─────────────────────────────────────────────────────────────
-#  AUTH
+#  SECURITY & AUTHENTICATION HELPERS
+# ─────────────────────────────────────────────────────────────
+_user_table_checked = False
+def ensure_user_columns():
+    global _user_table_checked
+    if _user_table_checked:
+        return
+    try:
+        db_exec("""
+            ALTER TABLE Users ADD COLUMN IF NOT EXISTS email VARCHAR(120);
+            ALTER TABLE Users ADD COLUMN IF NOT EXISTS full_name VARCHAR(100);
+            ALTER TABLE Users ADD COLUMN IF NOT EXISTS phone VARCHAR(30);
+            ALTER TABLE Users ADD COLUMN IF NOT EXISTS email_verified BOOLEAN DEFAULT TRUE;
+            ALTER TABLE Users ADD COLUMN IF NOT EXISTS otp_code VARCHAR(10);
+            ALTER TABLE Users ADD COLUMN IF NOT EXISTS otp_expiry TIMESTAMP;
+            UPDATE Users SET email = 'admin@scwms.com', email_verified = TRUE
+            WHERE LOWER(Username) = 'admin' AND (email IS NULL OR email = '');
+        """)
+        _user_table_checked = True
+    except Exception:
+        pass
+
+def send_otp_email(to_email, otp_code, purpose="Verification"):
+    smtp_host = os.environ.get('SMTP_HOST', 'smtp.gmail.com')
+    smtp_port = int(os.environ.get('SMTP_PORT', 587))
+    smtp_user = os.environ.get('SMTP_USER') or os.environ.get('MAIL_USERNAME')
+    smtp_pass = os.environ.get('SMTP_PASS') or os.environ.get('MAIL_PASSWORD')
+
+    if smtp_user and smtp_pass:
+        try:
+            msg = MIMEMultipart('alternative')
+            msg['Subject'] = f"SC&WMS Security Code: {otp_code}"
+            msg['From'] = f"SC&WMS Security <{smtp_user}>"
+            msg['To'] = to_email
+
+            plain_text = f"Your SC&WMS one-time verification code is: {otp_code}. Valid for 10 minutes."
+            html_text = f"""
+            <div style="font-family:'Segoe UI',Arial,sans-serif;max-width:480px;margin:20px auto;padding:24px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;">
+              <h2 style="color:#0f172a;margin-top:0;font-size:20px;">SC&amp;WMS Platform</h2>
+              <p style="color:#475569;font-size:14px;line-height:1.5;">Your one-time verification code for <strong>{purpose}</strong> is:</p>
+              <div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:16px;text-align:center;margin:20px 0;">
+                <span style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#1e40af;font-family:monospace;">{otp_code}</span>
+              </div>
+              <p style="color:#64748b;font-size:12px;line-height:1.4;">Valid for 10 minutes. If you did not make this request, please ignore.</p>
+            </div>
+            """
+            msg.attach(MIMEText(plain_text, 'plain'))
+            msg.attach(MIMEText(html_text, 'html'))
+
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=8) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_pass)
+                server.sendmail(smtp_user, [to_email], msg.as_string())
+            return True, "Email sent successfully"
+        except Exception as e:
+            return False, f"SMTP error: {e}"
+    return False, "SMTP not configured"
+
+# ─────────────────────────────────────────────────────────────
+#  AUTH (LOGIN, REGISTER, OTP VERIFY, RESET)
 # ─────────────────────────────────────────────────────────────
 @app.route('/', methods=['GET', 'POST'])
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if 'user' in session:
         return redirect(url_for('dashboard'))
+    ensure_user_columns()
     if request.method == 'POST':
-        username = request.form.get('username', '').strip()
+        login_id = (request.form.get('email') or request.form.get('username') or '').strip()
         password = request.form.get('password', '').strip()
         try:
-            rows = db_fetch('SELECT * FROM Users WHERE Username=%s', (username,))
+            rows = db_fetch("""
+                SELECT * FROM Users
+                WHERE LOWER(COALESCE(Email, '')) = LOWER(%s)
+                   OR LOWER(Username) = LOWER(%s)
+            """, (login_id, login_id))
+
             if rows and check_password_hash(rows[0]['password'], password):
+                u = rows[0]
+                if u.get('email_verified') is False and u.get('email'):
+                    otp = f"{secrets.randbelow(900000) + 100000}"
+                    otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+                    db_exec("UPDATE Users SET otp_code=%s, otp_expiry=%s WHERE User_ID=%s",
+                            (otp, otp_expiry, u['user_id']))
+                    sent, _ = send_otp_email(u['email'], otp, "Account Activation")
+                    if sent:
+                        flash('Please verify your email. A verification code was sent to your inbox.', 'warning')
+                    else:
+                        flash(f'Please verify your email. Code: {otp} (Demo Mode active)', 'warning')
+                    return redirect(url_for('verify_otp', email=u['email']))
+
                 session.clear()
-                session['user'] = rows[0]['username']
-                session['role'] = rows[0]['role']
+                session['user'] = u['username']
+                session['role'] = u.get('role', 'Viewer')
+                session['email'] = u.get('email') or ''
                 session.permanent = True
                 return redirect(url_for('dashboard'))
-            flash('Invalid credentials.', 'error')
+
+            flash('Invalid email or password.', 'error')
         except ConnectionError as e:
             flash(str(e), 'error')
+        except Exception as e:
+            flash(f'Sign in error: {e}', 'error')
     return render_template('login.html')
+
+@app.route('/register', methods=['GET', 'POST'])
+def register():
+    if 'user' in session:
+        return redirect(url_for('dashboard'))
+    ensure_user_columns()
+    if request.method == 'POST':
+        full_name = request.form.get('full_name', '').strip()
+        username = request.form.get('username', '').strip()
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '').strip()
+        confirm_password = request.form.get('confirm_password', '').strip()
+
+        if not email or '@' not in email:
+            flash('Please enter a valid email address.', 'error')
+            return render_template('register.html')
+        if not username or len(username) < 3:
+            flash('Username must be at least 3 characters long.', 'error')
+            return render_template('register.html')
+        if len(password) < 8:
+            flash('Password must be at least 8 characters long.', 'error')
+            return render_template('register.html')
+        if password != confirm_password:
+            flash('Passwords do not match.', 'error')
+            return render_template('register.html')
+
+        try:
+            exists = db_fetch("""
+                SELECT Username, Email FROM Users
+                WHERE LOWER(Username) = LOWER(%s) OR LOWER(COALESCE(Email, '')) = LOWER(%s)
+            """, (username, email))
+
+            if exists:
+                if exists[0]['username'].lower() == username.lower():
+                    flash('Username is already taken. Please choose another.', 'error')
+                else:
+                    flash('An account with this email already exists.', 'error')
+                return render_template('register.html')
+
+            otp = f"{secrets.randbelow(900000) + 100000}"
+            otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+            pwd_hash = generate_password_hash(password)
+
+            db_exec("""
+                INSERT INTO Users (Username, Password, Role, email, full_name, email_verified, otp_code, otp_expiry)
+                VALUES (%s, %s, 'Viewer', %s, %s, FALSE, %s, %s)
+            """, (username, pwd_hash, email, full_name, otp, otp_expiry))
+
+            sent, msg = send_otp_email(email, otp, "Account Registration")
+            if sent:
+                flash(f'Verification OTP sent to {email}.', 'info')
+            else:
+                flash(f'Verification code: {otp} (Demo Mode active — configure SMTP in Vercel to email directly)', 'warning')
+
+            return redirect(url_for('verify_otp', email=email))
+
+        except Exception as e:
+            flash(f'Registration error: {e}', 'error')
+
+    return render_template('register.html')
+
+@app.route('/verify-otp', methods=['GET', 'POST'])
+def verify_otp():
+    email = request.args.get('email', '') or request.form.get('email', '')
+    email = email.strip().lower()
+    ensure_user_columns()
+
+    if request.method == 'POST':
+        otp = request.form.get('otp', '').strip()
+        if not otp or len(otp) != 6:
+            flash('Please enter the 6-digit verification code.', 'error')
+            return render_template('verify_otp.html', email=email)
+
+        try:
+            rows = db_fetch("""
+                SELECT * FROM Users WHERE LOWER(COALESCE(Email, '')) = LOWER(%s)
+            """, (email,))
+
+            if not rows:
+                flash('User account not found.', 'error')
+                return redirect(url_for('register'))
+
+            user = rows[0]
+            if user.get('otp_code') == otp:
+                expiry = user.get('otp_expiry')
+                if expiry and isinstance(expiry, datetime) and expiry < datetime.utcnow():
+                    flash('OTP has expired. Please click "Resend OTP".', 'error')
+                    return render_template('verify_otp.html', email=email)
+
+                db_exec("""
+                    UPDATE Users SET email_verified = TRUE, otp_code = NULL, otp_expiry = NULL
+                    WHERE LOWER(COALESCE(Email, '')) = LOWER(%s)
+                """, (email,))
+
+                flash('Email verified successfully! You can now sign in.', 'success')
+                return redirect(url_for('login'))
+            else:
+                flash('Invalid verification code. Please try again.', 'error')
+        except Exception as e:
+            flash(f'Verification error: {e}', 'error')
+
+    return render_template('verify_otp.html', email=email)
+
+@app.route('/resend-otp', methods=['POST'])
+def resend_otp():
+    email = request.form.get('email', '').strip().lower()
+    ensure_user_columns()
+    if not email:
+        flash('Email address is missing.', 'error')
+        return redirect(url_for('register'))
+
+    try:
+        rows = db_fetch("SELECT * FROM Users WHERE LOWER(COALESCE(Email, '')) = LOWER(%s)", (email,))
+        if not rows:
+            flash('Account not found.', 'error')
+            return redirect(url_for('register'))
+
+        otp = f"{secrets.randbelow(900000) + 100000}"
+        otp_expiry = datetime.utcnow() + timedelta(minutes=10)
+
+        db_exec("""
+            UPDATE Users SET otp_code = %s, otp_expiry = %s
+            WHERE LOWER(COALESCE(Email, '')) = LOWER(%s)
+        """, (otp, otp_expiry, email))
+
+        sent, msg = send_otp_email(email, otp, "OTP Resend")
+        if sent:
+            flash(f'A fresh OTP has been sent to {email}.', 'info')
+        else:
+            flash(f'New OTP: {otp} (Demo Mode active)', 'warning')
+
+    except Exception as e:
+        flash(f'Error resending OTP: {e}', 'error')
+
+    return redirect(url_for('verify_otp', email=email))
+
+@app.route('/forgot-password', methods=['GET', 'POST'])
+def forgot_password():
+    if request.method == 'POST':
+        email = request.form.get('email', '').strip().lower()
+        if not email:
+            flash('Please enter your email address.', 'error')
+            return render_template('forgot_password.html')
+
+        ensure_user_columns()
+        try:
+            rows = db_fetch("SELECT * FROM Users WHERE LOWER(COALESCE(Email, '')) = LOWER(%s)", (email,))
+            if rows:
+                otp = f"{secrets.randbelow(900000) + 100000}"
+                otp_expiry = datetime.utcnow() + timedelta(minutes=15)
+                db_exec("UPDATE Users SET otp_code = %s, otp_expiry = %s WHERE LOWER(COALESCE(Email, '')) = LOWER(%s)",
+                        (otp, otp_expiry, email))
+                sent, _ = send_otp_email(email, otp, "Password Reset")
+                if sent:
+                    flash(f'Password reset instructions sent to {email}.', 'info')
+                else:
+                    flash(f'Password Reset Code: {otp} (Demo Mode active)', 'warning')
+            else:
+                flash(f'If an account exists for {email}, instructions have been sent.', 'info')
+        except Exception as e:
+            flash(f'Error: {e}', 'error')
+
+        return redirect(url_for('login'))
+
+    return render_template('forgot_password.html')
 
 @app.route('/logout')
 def logout():
@@ -168,9 +416,32 @@ def dashboard():
     recent_orders = db_fetch(
         'SELECT * FROM Order_Summary ORDER BY Order_ID DESC LIMIT 5')
     low_stock = db_fetch('SELECT * FROM Low_Stock_Alert LIMIT 5')
+
+    # Shipment status counts
+    status_rows = db_fetch('SELECT Status, COUNT(*) AS c FROM Orders GROUP BY Status')
+    shipment_counts = {r['status']: r['c'] for r in status_rows}
+
+    # Transit shipments for pipeline display
+    try:
+        transit_shipments = db_fetch("""
+            SELECT s.Shipment_ID, COALESCE(w.Location, 'Central Hub') AS origin,
+                   COALESCE(c.Address, 'Customer Site') AS destination
+            FROM Shipment s
+            JOIN Orders o ON s.Order_ID = o.Order_ID
+            LEFT JOIN Warehouse w ON s.Origin_Warehouse_ID = w.Warehouse_ID
+            LEFT JOIN Customer c ON o.Customer_ID = c.Customer_ID
+            WHERE s.Status = 'In Transit'
+            ORDER BY s.Shipment_ID DESC LIMIT 5
+        """)
+    except Exception:
+        transit_shipments = []
+
     return render_template('dashboard.html', stats=stats,
                            recent_orders=recent_orders,
-                           low_stock=low_stock, map_data=map_payload(active_only=True))
+                           low_stock=low_stock,
+                           shipment_counts=shipment_counts,
+                           transit_shipments=transit_shipments,
+                           map_data=map_payload(active_only=True))
 
 # ─────────────────────────────────────────────────────────────
 #  SUPPLIERS

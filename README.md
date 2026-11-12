@@ -1,6 +1,5 @@
-# Supply Chain & Warehouse Management System (SC&WMS) — v2
-**Student:** Mubashira Zainab | BS Mathematics 5th Semester | CASPAM, BZU Multan
-**Course:** DBMS (COMP351) | **Supervisor:** Dr. Imran Javaid | 2026
+# SC&WMS — Enterprise Supply Chain & Warehouse Management System
+Enterprise-grade cloud platform for multi-warehouse inventory, intelligent route tracking, and AI-powered operational analytics.
 
 A database-driven web application (Flask + PostgreSQL) for suppliers, products, warehouses, stock,
 customers, orders and shipments — now with an **AI data assistant** and **live map tracking**.

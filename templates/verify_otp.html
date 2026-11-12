@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block auth_content %}
+<div class="auth-page">
+  <div class="auth-container" style="max-width:460px">
+    <div class="auth-form-panel" style="width:100%;padding:48px 40px">
+
+      <div style="text-align:center;margin-bottom:28px">
+        <div style="width:64px;height:64px;background:linear-gradient(135deg,#2563eb,#7c3aed);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px">
+          <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" style="width:28px;height:28px">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+        </div>
+        <div class="auth-form-title">Verify Your Email</div>
+        <div class="auth-form-sub">
+          We sent a 6-digit OTP to<br>
+          <strong style="color:var(--color-text)">{{ email }}</strong>
+        </div>
+      </div>
+
+      {% with messages = get_flashed_messages(with_categories=true) %}
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+          </svg>
+          <span>{{ message }}</span>
+        </div>
+        {% endfor %}
+      {% endwith %}
+
+      <form method="POST" action="{{ url_for('verify_otp') }}" id="otpForm">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <input type="hidden" name="email" value="{{ email }}">
+
+        <div style="text-align:center;margin-bottom:8px;font-size:12.5px;color:var(--color-text-muted)">
+          Enter the 6-digit code
+        </div>
+
+        <div class="otp-inputs" id="otpInputs">
+          <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
+          <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
+          <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
+          <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
+          <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
+          <input class="otp-input" type="text" maxlength="1" inputmode="numeric" pattern="[0-9]" autocomplete="off">
+        </div>
+        <input type="hidden" name="otp" id="otpHidden">
+
+        <div style="text-align:center;font-size:12px;color:var(--color-text-muted);margin-bottom:20px">
+          OTP expires in <strong id="timer" style="color:var(--color-primary)">10:00</strong>
+        </div>
+
+        <button type="submit" class="btn btn-primary" style="width:100%;justify-content:center;padding:11px">
+          Verify & Activate Account
+        </button>
+      </form>
+
+      <div style="text-align:center;margin-top:16px">
+        <form method="POST" action="{{ url_for('resend_otp') }}" style="display:inline">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="email" value="{{ email }}">
+          <button type="submit" class="btn btn-secondary btn-sm" style="font-size:12.5px">
+            Resend OTP
+          </button>
+        </form>
+        <span style="margin:0 8px;color:var(--color-text-light);font-size:13px">|</span>
+        <a href="{{ url_for('register') }}" style="font-size:12.5px">Use different email</a>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<script>
+document.documentElement.setAttribute('data-theme', localStorage.getItem('theme') || 'light');
+
+// OTP inputs: auto-advance and backspace
+const inputs = document.querySelectorAll('.otp-input');
+inputs.forEach((inp, i) => {
+  inp.addEventListener('input', e => {
+    const v = e.target.value.replace(/\D/g,'');
+    e.target.value = v;
+    if (v && i < inputs.length - 1) inputs[i+1].focus();
+    updateHidden();
+  });
+  inp.addEventListener('keydown', e => {
+    if (e.key === 'Backspace' && !inp.value && i > 0) inputs[i-1].focus();
+  });
+  inp.addEventListener('paste', e => {
+    e.preventDefault();
+    const data = e.clipboardData.getData('text').replace(/\D/g,'').slice(0,6);
+    [...data].forEach((c,j) => { if(inputs[j]) inputs[j].value = c; });
+    if(inputs[data.length-1]) inputs[data.length-1].focus();
+    updateHidden();
+  });
+});
+function updateHidden() {
+  document.getElementById('otpHidden').value = [...inputs].map(x=>x.value).join('');
+}
+if(inputs[0]) inputs[0].focus();
+
+// Countdown timer
+let secs = 600;
+const timerEl = document.getElementById('timer');
+const tick = setInterval(() => {
+  secs--;
+  if(secs <= 0) { clearInterval(tick); timerEl.textContent = 'Expired'; timerEl.style.color='#ef4444'; return; }
+  const m = Math.floor(secs/60), s = secs%60;
+  timerEl.textContent = m+':'+(s<10?'0':'')+s;
+  if(secs < 60) timerEl.style.color = '#ef4444';
+}, 1000);
+</script>
+{% endblock %}
