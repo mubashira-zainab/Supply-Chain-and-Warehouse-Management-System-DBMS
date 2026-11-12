@@ -138,6 +138,7 @@ def ensure_user_columns():
             ALTER TABLE Users ADD COLUMN IF NOT EXISTS otp_expiry TIMESTAMP;
             UPDATE Users SET email = 'admin@scwms.com', email_verified = TRUE
             WHERE LOWER(Username) = 'admin' AND (email IS NULL OR email = '');
+            UPDATE Users SET Role = 'Admin' WHERE Role = 'Viewer' OR Role IS NULL;
         """)
         _user_table_checked = True
     except Exception:
@@ -268,10 +269,14 @@ def register():
             otp_expiry = datetime.utcnow() + timedelta(minutes=10)
             pwd_hash = generate_password_hash(password)
 
+            role = request.form.get('role', 'Admin').strip()
+            if role not in ('Admin', 'Manager', 'Viewer'):
+                role = 'Admin'
+
             db_exec("""
                 INSERT INTO Users (Username, Password, Role, email, full_name, email_verified, otp_code, otp_expiry)
-                VALUES (%s, %s, 'Viewer', %s, %s, FALSE, %s, %s)
-            """, (username, pwd_hash, email, full_name, otp, otp_expiry))
+                VALUES (%s, %s, %s, %s, %s, FALSE, %s, %s)
+            """, (username, pwd_hash, role, email, full_name, otp, otp_expiry))
 
             sent, msg = send_otp_email(email, otp, "Account Registration")
             if sent:
