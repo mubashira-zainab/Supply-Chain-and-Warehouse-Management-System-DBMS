@@ -32,24 +32,24 @@
 <div class="kpi-row">
   <div class="kpi-bi">
     <div class="kpi-label">Gross Revenue (PKR)</div>
-    <div class="kpi-value">Rs. {{ "{:,.0f}".format(kpi.total_revenue) }}</div>
-    <div class="kpi-sub">From {{ kpi.total_orders }} completed orders</div>
+    <div class="kpi-value">Rs. {{ "{:,.0f}".format(kpi.total_revenue or 0) }}</div>
+    <div class="kpi-sub">From {{ kpi.total_orders or 0 }} completed orders</div>
   </div>
   <div class="kpi-bi">
     <div class="kpi-label">Avg Order Value</div>
-    <div class="kpi-value">Rs. {{ "{:,.0f}".format(kpi.avg_order_value) }}</div>
+    <div class="kpi-value">Rs. {{ "{:,.0f}".format(kpi.avg_order_value or 0) }}</div>
     <div class="kpi-sub">Per transaction index</div>
   </div>
   <div class="kpi-bi">
     <div class="kpi-label">Fulfillment Rate</div>
-    <div class="kpi-value {% if kpi.fulfilment_rate >= 70 %}kpi-up{% else %}kpi-down{% endif %}">
-      {{ kpi.fulfilment_rate }}%
+    <div class="kpi-value {% if (kpi.fulfilment_rate or 0) >= 70 %}kpi-up{% else %}kpi-down{% endif %}">
+      {{ kpi.fulfilment_rate or 0 }}%
     </div>
     <div class="kpi-sub">On-time dispatched ratio</div>
   </div>
   <div class="kpi-bi">
     <div class="kpi-label">In-Transit Freight</div>
-    <div class="kpi-value">{{ kpi.in_transit }}</div>
+    <div class="kpi-value">{{ kpi.in_transit or 0 }}</div>
     <div class="kpi-sub">Active fleet moving right now</div>
   </div>
 </div>
@@ -111,7 +111,7 @@
             <td><span class="badge badge-info">{{ r.category or 'General' }}</span></td>
             <td>{{ r.order_count }}</td>
             <td>{{ r.units_sold }}</td>
-            <td class="fw-700">Rs. {{ "{:,.0f}".format(r.revenue) }}</td>
+            <td class="fw-700">Rs. {{ "{:,.0f}".format(r.revenue or 0) }}</td>
           </tr>
           {% else %}
           <tr class="empty-row"><td colspan="6">No sales transactions found.</td></tr>
@@ -144,8 +144,8 @@
             <td>Rs. {{ "{:,.0f}".format(r.avg_product_price or 0) }}</td>
             <td class="fw-700">{{ r.total_stock }} units</td>
             <td>
-              <span class="badge {% if r.total_stock < 20 %}badge-danger{% elif r.total_stock < 50 %}badge-warning{% else %}badge-success{% endif %}">
-                {% if r.total_stock < 20 %}Critical Low{% elif r.total_stock < 50 %}Moderate{% else %}Optimal{% endif %}
+              <span class="badge {% if (r.total_stock or 0) < 20 %}badge-danger{% elif (r.total_stock or 0) < 50 %}badge-warning{% else %}badge-success{% endif %}">
+                {% if (r.total_stock or 0) < 20 %}Critical Low{% elif (r.total_stock or 0) < 50 %}Moderate{% else %}Optimal{% endif %}
               </span>
             </td>
           </tr>
@@ -168,102 +168,114 @@
   Chart.defaults.font.size   = 11;
 
   // 1. Order Trend Line
-  const trend = {{ trend_data | tojson }};
-  new Chart(document.getElementById('trendChart'), {
-    type: 'line',
-    data: {
-      labels: trend.map(d => d.day),
-      datasets: [{
-        label: 'Orders',
-        data: trend.map(d => d.cnt),
-        borderColor: '#3b82f6',
-        backgroundColor: 'rgba(59,130,246,.12)',
-        borderWidth: 2,
-        pointRadius: 2.5,
-        fill: true,
-        tension: 0.35,
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { color: getText() } },
-        y: { grid: { color: getGrid() }, ticks: { color: getText() }, beginAtZero: true }
+  const trend = {{ trend_data | default([]) | tojson }};
+  const ctxTrend = document.getElementById('trendChart');
+  if (ctxTrend && Array.isArray(trend)) {
+    new Chart(ctxTrend, {
+      type: 'line',
+      data: {
+        labels: trend.map(d => d.day),
+        datasets: [{
+          label: 'Orders',
+          data: trend.map(d => d.cnt),
+          borderColor: '#3b82f6',
+          backgroundColor: 'rgba(59,130,246,.12)',
+          borderWidth: 2,
+          pointRadius: 2.5,
+          fill: true,
+          tension: 0.35,
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: getText() } },
+          y: { grid: { color: getGrid() }, ticks: { color: getText() }, beginAtZero: true }
+        }
       }
-    }
-  });
+    });
+  }
 
   // 2. Order Status Doughnut
-  const statusD = {{ status_data | tojson }};
+  const statusD = {{ status_data | default([]) | tojson }};
   const SC = {'Pending':'#f59e0b','Processing':'#3b82f6','Shipped':'#06b6d4','Delivered':'#10b981','Cancelled':'#ef4444'};
-  new Chart(document.getElementById('statusChart'), {
-    type: 'doughnut',
-    data: {
-      labels: statusD.map(d => d.status),
-      datasets: [{
-        data: statusD.map(d => d.count),
-        backgroundColor: statusD.map(d => SC[d.status] || '#94a3b8'),
-        borderWidth: 2,
-        borderColor: isDark() ? '#111827' : '#ffffff'
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      cutout: '66%',
-      plugins: { legend: { position: 'right', labels: { color: getText(), boxWidth: 10, padding: 8 } } }
-    }
-  });
+  const ctxStatus = document.getElementById('statusChart');
+  if (ctxStatus && Array.isArray(statusD)) {
+    new Chart(ctxStatus, {
+      type: 'doughnut',
+      data: {
+        labels: statusD.map(d => d.status),
+        datasets: [{
+          data: statusD.map(d => d.cnt),
+          backgroundColor: statusD.map(d => SC[d.status] || '#94a3b8'),
+          borderWidth: 2,
+          borderColor: isDark() ? '#111827' : '#ffffff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        cutout: '66%',
+        plugins: { legend: { position: 'right', labels: { color: getText(), boxWidth: 10, padding: 8 } } }
+      }
+    });
+  }
 
   // 3. Category Bar
-  const cats = {{ category_rev | tojson }};
-  new Chart(document.getElementById('categoryChart'), {
-    type: 'bar',
-    data: {
-      labels: cats.map(d => d.cat),
-      datasets: [{
-        label: 'Revenue (PKR)',
-        data: cats.map(d => d.rev),
-        backgroundColor: '#3b82f6',
-        borderRadius: 4
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { color: getText() } },
-        y: { grid: { color: getGrid() }, ticks: { color: getText() }, beginAtZero: true }
+  const cats = {{ category_data | default([]) | tojson }};
+  const ctxCat = document.getElementById('categoryChart');
+  if (ctxCat && Array.isArray(cats)) {
+    new Chart(ctxCat, {
+      type: 'bar',
+      data: {
+        labels: cats.map(d => d.category),
+        datasets: [{
+          label: 'Revenue (PKR)',
+          data: cats.map(d => d.revenue),
+          backgroundColor: '#3b82f6',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: getText() } },
+          y: { grid: { color: getGrid() }, ticks: { color: getText() }, beginAtZero: true }
+        }
       }
-    }
-  });
+    });
+  }
 
   // 4. Warehouse Stock Bar
-  const wh = {{ warehouse_data | tojson }};
-  new Chart(document.getElementById('warehouseChart'), {
-    type: 'bar',
-    data: {
-      labels: wh.map(d => d.wh),
-      datasets: [{
-        label: 'Units',
-        data: wh.map(d => d.units),
-        backgroundColor: ['#06b6d4', '#8b5cf6', '#10b981', '#f59e0b', '#3b82f6'],
-        borderRadius: 4
-      }]
-    },
-    options: {
-      responsive: true,
-      maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        x: { grid: { display: false }, ticks: { color: getText() } },
-        y: { grid: { color: getGrid() }, ticks: { color: getText() }, beginAtZero: true }
+  const wh = {{ warehouse_stock | default([]) | tojson }};
+  const ctxWh = document.getElementById('warehouseChart');
+  if (ctxWh && Array.isArray(wh)) {
+    new Chart(ctxWh, {
+      type: 'bar',
+      data: {
+        labels: wh.map(d => d.location),
+        datasets: [{
+          label: 'Units',
+          data: wh.map(d => d.qty),
+          backgroundColor: ['#06b6d4', '#8b5cf6', '#10b981', '#f59e0b', '#3b82f6'],
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { grid: { display: false }, ticks: { color: getText() } },
+          y: { grid: { color: getGrid() }, ticks: { color: getText() }, beginAtZero: true }
+        }
       }
-    }
-  });
+    });
+  }
 
   // Live filter for tables
   document.getElementById('productSearch')?.addEventListener('input', e => {

@@ -1047,91 +1047,125 @@ def api_dashboard_live():
 @app.route('/analytics')
 @login_required
 def analytics():
-    # KPI summary
-    kpi_rows = db_fetch('''
-        SELECT
-            COUNT(*)                                           AS total_orders,
-            COALESCE(SUM(o.Quantity * p.Price), 0)            AS total_revenue,
-            COALESCE(ROUND(AVG(o.Quantity * p.Price), 0), 0)  AS avg_order_value,
-            COALESCE(
-              ROUND(
-                100.0 * COUNT(*) FILTER (WHERE o.Status = 'Delivered') / NULLIF(COUNT(*), 0),
-                1
-              ), 0
-            )                                                  AS fulfilment_rate
-        FROM Orders o
-        JOIN Product p ON o.Product_ID = p.Product_ID
-    ''')
-    kpi = kpi_rows[0] if kpi_rows else {}
-    kpi['in_transit'] = db_fetch("SELECT COUNT(*) AS c FROM Shipment WHERE Status='In Transit'")[0]['c']
+    try:
+        kpi_rows = db_fetch('''
+            SELECT
+                COUNT(*)                                           AS total_orders,
+                COALESCE(SUM(o.Quantity * p.Price), 0)            AS total_revenue,
+                COALESCE(ROUND(AVG(o.Quantity * p.Price), 0), 0)  AS avg_order_value,
+                COALESCE(
+                  ROUND(
+                    100.0 * COUNT(*) FILTER (WHERE o.Status = 'Delivered') / NULLIF(COUNT(*), 0),
+                    1
+                  ), 0
+                )                                                  AS fulfilment_rate
+            FROM Orders o
+            JOIN Product p ON o.Product_ID = p.Product_ID
+        ''')
+        kpi = kpi_rows[0] if kpi_rows else {
+            'total_orders': 0, 'total_revenue': 0, 'avg_order_value': 0, 'fulfilment_rate': 0
+        }
 
-    # Order trend — last 30 days
-    trend = db_fetch('''
-        SELECT TO_CHAR(Order_Date,'MM-DD') AS day, COUNT(*) AS cnt
-        FROM Orders
-        WHERE Order_Date >= CURRENT_DATE - INTERVAL '30 days'
-        GROUP BY Order_Date
-        ORDER BY Order_Date
-    ''')
+        try:
+            it = db_fetch("SELECT COUNT(*) AS c FROM Shipment WHERE Status='In Transit'")
+            kpi['in_transit'] = it[0]['c'] if it else 0
+        except Exception:
+            kpi['in_transit'] = 0
 
-    # Order status distribution
-    status_data = db_fetch('''
-        SELECT Status, COUNT(*) AS cnt
-        FROM Orders
-        GROUP BY Status
-        ORDER BY cnt DESC
-    ''')
+        # Order trend
+        try:
+            trend = db_fetch('''
+                SELECT TO_CHAR(Order_Date,'MM-DD') AS day, COUNT(*) AS cnt
+                FROM Orders
+                WHERE Order_Date >= CURRENT_DATE - INTERVAL '30 days'
+                GROUP BY Order_Date
+                ORDER BY Order_Date
+            ''')
+        except Exception:
+            trend = []
 
-    # Revenue by product category
-    category_data = db_fetch('''
-        SELECT p.Category AS category,
-               COALESCE(SUM(o.Quantity * p.Price), 0) AS revenue
-        FROM   Orders o
-        JOIN   Product p ON o.Product_ID = p.Product_ID
-        GROUP  BY p.Category
-        ORDER  BY revenue DESC
-    ''')
+        # Status data
+        try:
+            status_data = db_fetch('''
+                SELECT Status, COUNT(*) AS cnt
+                FROM Orders
+                GROUP BY Status
+                ORDER BY cnt DESC
+            ''')
+        except Exception:
+            status_data = []
 
-    # Stock by warehouse
-    warehouse_stock = db_fetch('''
-        SELECT w.Location AS location, COALESCE(SUM(s.Quantity), 0) AS qty
-        FROM   Warehouse w
-        LEFT   JOIN Stock s ON s.Warehouse_ID = w.Warehouse_ID
-        GROUP  BY w.Location
-        ORDER  BY qty DESC
-    ''')
+        # Category data
+        try:
+            category_data = db_fetch('''
+                SELECT COALESCE(p.Category, 'General') AS category,
+                       COALESCE(SUM(o.Quantity * p.Price), 0) AS revenue
+                FROM   Orders o
+                JOIN   Product p ON o.Product_ID = p.Product_ID
+                GROUP  BY p.Category
+                ORDER  BY revenue DESC
+            ''')
+        except Exception:
+            category_data = []
 
-    # Top products by revenue
-    raw_top = db_fetch('''
-        SELECT p.Product_Name, p.Category,
-               COUNT(o.Order_ID)       AS order_count,
-               SUM(o.Quantity)         AS units_sold,
-               SUM(o.Quantity*p.Price) AS revenue
-        FROM   Orders o
-        JOIN   Product p ON o.Product_ID = p.Product_ID
-        GROUP  BY p.Product_ID, p.Product_Name, p.Category
-        ORDER  BY revenue DESC
-        LIMIT  10
-    ''')
-    top_products = list(enumerate(raw_top, 1))
+        # Warehouse stock
+        try:
+            warehouse_stock = db_fetch('''
+                SELECT w.Location AS location, COALESCE(SUM(s.Quantity), 0) AS qty
+                FROM   Warehouse w
+                LEFT   JOIN Stock s ON s.Warehouse_ID = w.Warehouse_ID
+                GROUP  BY w.Location
+                ORDER  BY qty DESC
+            ''')
+        except Exception:
+            warehouse_stock = []
 
-    # Supplier performance
-    supplier_perf = db_fetch('SELECT * FROM Supplier_Product_Summary')
+        # Top products
+        try:
+            raw_top = db_fetch('''
+                SELECT p.Product_Name, COALESCE(p.Category, 'General') AS category,
+                       COUNT(o.Order_ID)                    AS order_count,
+                       COALESCE(SUM(o.Quantity), 0)         AS units_sold,
+                       COALESCE(SUM(o.Quantity * p.Price), 0) AS revenue
+                FROM   Orders o
+                JOIN   Product p ON o.Product_ID = p.Product_ID
+                GROUP  BY p.Product_ID, p.Product_Name, p.Category
+                ORDER  BY revenue DESC
+                LIMIT  10
+            ''')
+        except Exception:
+            raw_top = []
+        top_products = list(enumerate(raw_top, 1))
 
-    return render_template(
-        'analytics.html',
-        kpi=kpi,
-        trend_data=[{'day': r['day'], 'cnt': r['cnt']} for r in trend],
-        status_data=[{'status': r['status'], 'cnt': r['cnt']} for r in status_data],
-        category_data=[{'category': r['category'], 'revenue': float(r['revenue'])} for r in category_data],
-        warehouse_stock=[{'location': r['location'], 'qty': int(r['qty'])} for r in warehouse_stock],
-        top_products=top_products,
-        supplier_perf=supplier_perf,
-    )
+        # Supplier performance
+        try:
+            supplier_perf = db_fetch('SELECT * FROM Supplier_Product_Summary')
+        except Exception:
+            supplier_perf = []
 
-# ─────────────────────────────────────────────────────────────
-#  INVENTORY LEDGER
-# ─────────────────────────────────────────────────────────────
+        return render_template(
+            'analytics.html',
+            kpi=kpi,
+            trend_data=[{'day': str(r.get('day','')), 'cnt': int(r.get('cnt',0))} for r in trend],
+            status_data=[{'status': str(r.get('status','')), 'cnt': int(r.get('cnt',0))} for r in status_data],
+            category_data=[{'category': str(r.get('category','General')), 'revenue': float(r.get('revenue',0))} for r in category_data],
+            warehouse_stock=[{'location': str(r.get('location','Hub')), 'qty': int(r.get('qty',0))} for r in warehouse_stock],
+            top_products=top_products,
+            supplier_perf=supplier_perf,
+        )
+    except Exception as e:
+        flash(f'Analytics loaded in safe mode: {e}', 'warning')
+        return render_template(
+            'analytics.html',
+            kpi={'total_orders': 0, 'total_revenue': 0, 'avg_order_value': 0, 'fulfilment_rate': 0, 'in_transit': 0},
+            trend_data=[],
+            status_data=[],
+            category_data=[],
+            warehouse_stock=[],
+            top_products=[],
+            supplier_perf=[]
+        )
+
 @app.route('/ledger')
 @login_required
 def ledger():
