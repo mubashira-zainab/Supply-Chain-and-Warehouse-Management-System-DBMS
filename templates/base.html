@@ -25,7 +25,9 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-logo">
-        <img src="{{ url_for('static', filename='img/logo-dark.png') }}" alt="SC&WMS" class="logo-img">
+        <img src="{{ url_for('static', filename='img/logo.png') }}" alt="SC&WMS" class="logo-img"
+             onerror="this.style.display='none';this.nextElementSibling.style.display='block'">
+        <span style="display:none">SC&WMS</span>
       </div>
       <button class="sidebar-toggle" onclick="toggleSidebar()" title="Collapse sidebar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">

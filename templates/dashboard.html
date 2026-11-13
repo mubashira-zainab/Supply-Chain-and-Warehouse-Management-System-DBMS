@@ -1,419 +1,225 @@
 {% extends 'base.html' %}
 {% block title %}Dashboard{% endblock %}
 {% block page_title %}
-  <span class="live-dot"></span> Operations Dashboard
+  <span class="live-dot"></span> Live Dashboard
 {% endblock %}
 
 {% block head %}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <style>
-/* ── DASHBOARD COMPACT GRID SYSTEM ── */
-.dash-kpis {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-  margin-bottom: 14px;
+/* ── DASHBOARD SPECIFIC ── */
+.dash-row-shipments { display: grid; grid-template-columns: 1.5fr 1fr; gap: 16px; margin-bottom: 16px; }
+.dash-row-mid       { display: grid; grid-template-columns: 1.3fr 1fr; gap: 16px; margin-bottom: 16px; }
+.dash-row-bottom    { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+
+@media (max-width:1200px) {
+  .dash-row-shipments { grid-template-columns: 1fr; }
+  .dash-row-mid       { grid-template-columns: 1fr; }
+  .dash-row-bottom    { grid-template-columns: 1fr 1fr; }
 }
-.kpi-tile {
-  background: var(--bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: 12px 14px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-  box-shadow: var(--shadow-sm);
-  transition: transform var(--transition), box-shadow var(--transition);
-  position: relative;
-  overflow: hidden;
-  height: 92px;
-}
-.kpi-tile:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
-.kpi-tile-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-.kpi-tile-icon {
-  width: 30px; height: 30px;
-  border-radius: var(--radius-sm);
-  display: flex; align-items: center; justify-content: center;
-}
-.kpi-tile-icon svg { width: 16px; height: 16px; }
-.kpi-tile-num {
-  font-size: 20px;
-  font-weight: 800;
-  color: var(--color-text);
-  line-height: 1;
-}
-.kpi-tile-meta {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  margin-top: 4px;
-}
-.kpi-tile-label {
-  font-size: 11px;
-  color: var(--color-text-muted);
-  font-weight: 500;
-}
-.kpi-sparkline {
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 90px;
-  height: 32px;
-  opacity: .75;
-  pointer-events: none;
+@media (max-width:640px) {
+  .dash-row-bottom { grid-template-columns: 1fr; }
 }
 
-/* ── ROW 2: SHIPMENTS BOARD (45%) + MAP (55%) ── */
-.dash-row-top {
-  display: grid;
-  grid-template-columns: 1.1fr 1.3fr;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-.ship-board {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
-  height: 100%;
-}
-.ship-col {
-  background: var(--bg-body);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-.ship-col-header {
-  font-size: 10.5px;
-  font-weight: 700;
-  padding: 5px 8px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: #fff;
-}
-.ship-col-header .count {
-  background: rgba(255,255,255,.3);
-  border-radius: 8px;
-  padding: 0 5px;
-  font-size: 9.5px;
-}
-.ship-cards {
-  padding: 5px;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  flex: 1;
-  overflow-y: auto;
-  max-height: 230px;
-}
-.ship-card-mini {
-  background: var(--bg-card);
-  border: 1px solid var(--color-border);
-  border-radius: 4px;
-  padding: 6px 7px;
-  font-size: 10.5px;
-  box-shadow: 0 1px 2px rgba(0,0,0,.04);
-}
-.ship-card-mini .id { font-weight: 700; color: var(--color-text); font-size: 10.5px; }
-.ship-card-mini .cust { color: var(--color-text-muted); font-size: 9.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px; }
-
-/* ── ROW 3: 4 CARDS SIDE BY SIDE ── */
-.dash-row-quad {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  margin-bottom: 14px;
-}
-.chart-box-compact {
-  height: 125px;
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.donut-legend {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  margin-left: 10px;
-  font-size: 11px;
-}
-.donut-legend-item { display: flex; align-items: center; gap: 6px; }
-.donut-dot { width: 8px; height: 8px; border-radius: 50%; }
-
-/* Funnel mini */
-.funnel-list { display: flex; flex-direction: column; gap: 7px; padding: 4px 0; }
-.funnel-item { display: flex; align-items: center; gap: 8px; font-size: 11px; }
-.funnel-name { width: 70px; font-weight: 600; color: var(--color-text-muted); flex-shrink: 0; }
-.funnel-bar-bg { flex: 1; height: 16px; background: var(--color-border); border-radius: 3px; overflow: hidden; }
-.funnel-bar-fill { height: 100%; border-radius: 3px; transition: width .6s; }
-.funnel-num { width: 24px; text-align: right; font-weight: 700; font-size: 11px; color: var(--color-text); }
-
-/* Checklist mini */
-.compliance-list { display: flex; flex-direction: column; gap: 9px; padding: 4px 0; }
-.compliance-item { display: flex; align-items: center; gap: 8px; font-size: 11px; }
-.compliance-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.compliance-text { flex: 1; color: var(--color-text); font-weight: 500; }
-.compliance-status { font-size: 10px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
-
-/* ── ROW 4: 3 CARDS ── */
-.dash-row-tri {
-  display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-.partner-grid {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 8px;
-  padding: 6px 0;
-}
-.partner-box {
-  background: var(--bg-body);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  padding: 10px 6px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  text-align: center;
-  position: relative;
-}
-.partner-box svg { width: 18px; height: 18px; color: var(--color-primary); }
-.partner-box span { font-size: 10px; font-weight: 600; color: var(--color-text); }
-.partner-check {
-  position: absolute;
-  top: 3px; right: 3px;
-  width: 6px; height: 6px;
-  background: #10b981;
-  border-radius: 50%;
-}
-
-/* Responsive */
-@media (max-width: 1200px) {
-  .dash-kpis { grid-template-columns: repeat(3, 1fr); }
-  .dash-row-top { grid-template-columns: 1fr; }
-  .dash-row-quad { grid-template-columns: 1fr 1fr; }
-  .dash-row-tri { grid-template-columns: 1fr; }
-}
-@media (max-width: 680px) {
-  .dash-kpis { grid-template-columns: 1fr 1fr; }
-  .dash-row-quad { grid-template-columns: 1fr; }
-}
+/* Funnel chart */
+.funnel-wrap { padding: 10px 16px 16px; }
+.funnel-row  { display: flex; align-items: center; gap: 10px; margin-bottom: 8px; }
+.funnel-label { width: 80px; font-size: 12px; font-weight: 600; color: var(--color-text); flex-shrink: 0; }
+.funnel-bar-wrap { flex: 1; display: flex; align-items: center; gap: 8px; }
+.funnel-bar  { height: 24px; border-radius: 4px; transition: width .6s ease; }
+.funnel-val  { font-size: 12px; font-weight: 700; color: var(--color-text); }
 </style>
 {% endblock %}
 
 {% block content %}
 
-<!-- ══ ROW 1: 5 COMPACT KPI TILES ══ -->
-<div class="dash-kpis">
+<!-- ══ KPI STRIP ══ -->
+<div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
 
-  <!-- Tile 1 -->
-  <div class="kpi-tile">
-    <div class="kpi-tile-top">
-      <div class="kpi-tile-icon" style="background:#eff6ff;color:#2563eb">
+  <div class="kpi-card">
+    <div class="kpi-card-top">
+      <div class="kpi-icon" style="background:#eff6ff;color:#2563eb">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 8"/>
+          <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
           <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
         </svg>
       </div>
-      <div class="kpi-tile-num">{{ stats.shipments }}</div>
+      <span class="kpi-change up">Live</span>
     </div>
-    <div class="kpi-tile-meta">
-      <span class="kpi-tile-label">Total Shipments</span>
-      <span class="badge badge-success" style="font-size:9.5px">+12%</span>
-    </div>
-    <svg class="kpi-sparkline" viewBox="0 0 100 30" preserveAspectRatio="none">
-      <path d="M0,25 Q20,10 40,18 T70,8 T100,12" fill="none" stroke="#2563eb" stroke-width="2.5"/>
-    </svg>
+    <div class="kpi-num" id="kpi-shipments">{{ stats.shipments }}</div>
+    <div class="kpi-label">Total Shipments</div>
   </div>
 
-  <!-- Tile 2 -->
-  <div class="kpi-tile">
-    <div class="kpi-tile-top">
-      <div class="kpi-tile-icon" style="background:#f0fdf4;color:#16a34a">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M22 11.08V12a10 10 0 11-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
-        </svg>
-      </div>
-      <div class="kpi-tile-num">{{ shipment_counts.get('Delivered', 0) }}</div>
-    </div>
-    <div class="kpi-tile-meta">
-      <span class="kpi-tile-label">Completed Deliveries</span>
-      <span class="badge badge-success" style="font-size:9.5px">98.4%</span>
-    </div>
-    <svg class="kpi-sparkline" viewBox="0 0 100 30" preserveAspectRatio="none">
-      <path d="M0,22 Q25,8 50,15 T80,5 T100,8" fill="none" stroke="#16a34a" stroke-width="2.5"/>
-    </svg>
-  </div>
-
-  <!-- Tile 3 -->
-  <div class="kpi-tile">
-    <div class="kpi-tile-top">
-      <div class="kpi-tile-icon" style="background:#ecfeff;color:#0891b2">
+  <div class="kpi-card">
+    <div class="kpi-card-top">
+      <div class="kpi-icon" style="background:#ecfeff;color:#0891b2">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
         </svg>
       </div>
-      <div class="kpi-tile-num">{{ stats.in_transit }}</div>
+      <span class="kpi-change up">Active</span>
     </div>
-    <div class="kpi-tile-meta">
-      <span class="kpi-tile-label">Active In-Transit</span>
-      <span class="badge badge-info" style="font-size:9.5px">Live</span>
-    </div>
-    <svg class="kpi-sparkline" viewBox="0 0 100 30" preserveAspectRatio="none">
-      <path d="M0,20 Q30,22 55,10 T85,14 T100,6" fill="none" stroke="#0891b2" stroke-width="2.5"/>
-    </svg>
+    <div class="kpi-num" id="kpi-transit">{{ stats.in_transit }}</div>
+    <div class="kpi-label">In Transit</div>
   </div>
 
-  <!-- Tile 4 -->
-  <div class="kpi-tile">
-    <div class="kpi-tile-top">
-      <div class="kpi-tile-icon" style="background:#fffbeb;color:#d97706">
+  <div class="kpi-card">
+    <div class="kpi-card-top">
+      <div class="kpi-icon" style="background:#fffbeb;color:#d97706">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/>
+          <path d="M6 2L3 6v14a2 2 0 002 2h14a2 2 0 002-2V6l-3-4z"/>
+          <line x1="3" y1="6" x2="21" y2="6"/>
         </svg>
       </div>
-      <div class="kpi-tile-num">{{ stats.orders }}</div>
+      <span class="kpi-change {% if stats.pending > 5 %}down{% else %}up{% endif %}">
+        {{ stats.pending }} new
+      </span>
     </div>
-    <div class="kpi-tile-meta">
-      <span class="kpi-tile-label">Customer Orders</span>
-      <span class="badge badge-warning" style="font-size:9.5px">{{ stats.pending }} pending</span>
-    </div>
-    <svg class="kpi-sparkline" viewBox="0 0 100 30" preserveAspectRatio="none">
-      <path d="M0,24 Q25,12 50,20 T75,8 T100,10" fill="none" stroke="#d97706" stroke-width="2.5"/>
-    </svg>
+    <div class="kpi-num" id="kpi-orders">{{ stats.orders }}</div>
+    <div class="kpi-label">Total Orders</div>
   </div>
 
-  <!-- Tile 5 -->
-  <div class="kpi-tile">
-    <div class="kpi-tile-top">
-      <div class="kpi-tile-icon" style="background:#f5f3ff;color:#7c3aed">
+  <div class="kpi-card">
+    <div class="kpi-card-top">
+      <div class="kpi-icon" style="background:#fef2f2;color:#dc2626">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+          <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+        </svg>
+      </div>
+      <span class="kpi-change {% if stats.low_stock > 0 %}down{% else %}up{% endif %}">
+        {% if stats.low_stock > 0 %}Alert{% else %}OK{% endif %}
+      </span>
+    </div>
+    <div class="kpi-num" id="kpi-low-stock">{{ stats.low_stock }}</div>
+    <div class="kpi-label">Low Stock</div>
+  </div>
+
+  <div class="kpi-card">
+    <div class="kpi-card-top">
+      <div class="kpi-icon" style="background:#f5f3ff;color:#7c3aed">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/>
         </svg>
       </div>
-      <div class="kpi-tile-num">{{ stats.suppliers }}</div>
+      <span class="kpi-change up">Registered</span>
     </div>
-    <div class="kpi-tile-meta">
-      <span class="kpi-tile-label">Active Suppliers</span>
-      <span class="badge badge-success" style="font-size:9.5px">Verified</span>
-    </div>
-    <svg class="kpi-sparkline" viewBox="0 0 100 30" preserveAspectRatio="none">
-      <path d="M0,20 Q30,8 60,18 T90,4 T100,7" fill="none" stroke="#7c3aed" stroke-width="2.5"/>
-    </svg>
+    <div class="kpi-num" id="kpi-suppliers">{{ stats.suppliers }}</div>
+    <div class="kpi-label">Suppliers</div>
   </div>
 
 </div>
 
-<!-- ══ ROW 2: SHIPMENTS BOARD (45%) + MAP (55%) ══ -->
-<div class="dash-row-top">
+<!-- ══ SHIPMENTS PIPELINE + MAP ══ -->
+<div class="dash-row-shipments">
 
-  <!-- Shipments 5-Col Board -->
-  <div class="card" style="display:flex;flex-direction:column">
-    <div class="card-header" style="padding:10px 14px;font-size:12.5px">
+  <!-- Shipments Pipeline -->
+  <div class="card">
+    <div class="card-header">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 8"/>
+        <rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
         <circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/>
       </svg>
       Shipments Pipeline
-      <a href="{{ url_for('shipments') }}" style="margin-left:auto;font-size:11px;color:var(--color-primary);font-weight:600">All Shipments &rarr;</a>
+      <a href="{{ url_for('shipments') }}" style="margin-left:auto;font-size:11.5px;color:var(--color-primary);font-weight:600">View All</a>
     </div>
-    <div class="card-body" style="padding:10px;flex:1">
-      <div class="ship-board">
+    <div class="card-body" style="padding:12px">
+      <div class="ship-pipeline">
 
         <!-- Pending -->
         <div class="ship-col">
           <div class="ship-col-header" style="background:#f59e0b">
-            <span>Pending</span><span class="count">{{ stats.pending }}</span>
+            Pending
+            <span class="count">{{ stats.pending }}</span>
           </div>
-          <div class="ship-cards">
-            {% for o in recent_orders if o.status == 'Pending' %}
-            <div class="ship-card-mini">
-              <div class="id">#ORD-{{ o.order_id }}</div>
-              <div class="cust">{{ o.customer_name }}</div>
+          {% for o in recent_orders if o.status == 'Pending' %}
+          <div class="ship-item">
+            <div class="ship-dot" style="background:#f59e0b"></div>
+            <div>
+              <div class="ship-id">#{{ o.order_id }}</div>
+              <div class="ship-name">{{ o.customer_name|truncate(14,true,'') }}</div>
             </div>
-            {% else %}
-            <div style="font-size:10px;color:var(--color-text-muted);text-align:center;padding:12px 0">Clear</div>
-            {% endfor %}
           </div>
+          {% else %}
+          <div class="ship-empty">None</div>
+          {% endfor %}
         </div>
 
         <!-- Processing -->
         <div class="ship-col">
           <div class="ship-col-header" style="background:#3b82f6">
-            <span>Processing</span><span class="count">{{ shipment_counts.get('Processing', 0) }}</span>
+            Processing
+            <span class="count">{{ shipment_counts.get('Processing', 0) }}</span>
           </div>
-          <div class="ship-cards">
-            {% for o in recent_orders if o.status == 'Processing' %}
-            <div class="ship-card-mini">
-              <div class="id">#ORD-{{ o.order_id }}</div>
-              <div class="cust">{{ o.customer_name }}</div>
+          {% for o in recent_orders if o.status == 'Processing' %}
+          <div class="ship-item">
+            <div class="ship-dot" style="background:#3b82f6"></div>
+            <div>
+              <div class="ship-id">#{{ o.order_id }}</div>
+              <div class="ship-name">{{ o.customer_name|truncate(14,true,'') }}</div>
             </div>
-            {% else %}
-            <div style="font-size:10px;color:var(--color-text-muted);text-align:center;padding:12px 0">Clear</div>
-            {% endfor %}
           </div>
+          {% else %}
+          <div class="ship-empty">None</div>
+          {% endfor %}
         </div>
 
-        <!-- In Transit -->
+        <!-- Shipped / In Transit -->
         <div class="ship-col">
           <div class="ship-col-header" style="background:#06b6d4">
-            <span>Transit</span><span class="count">{{ stats.in_transit }}</span>
+            In Transit
+            <span class="count">{{ stats.in_transit }}</span>
           </div>
-          <div class="ship-cards">
-            {% for s in transit_shipments[:4] %}
-            <div class="ship-card-mini">
-              <div class="id">#TRK-{{ s.shipment_id }}</div>
-              <div class="cust">{{ s.origin }} &rarr; {{ s.destination }}</div>
+          {% for s in transit_shipments[:3] %}
+          <div class="ship-item">
+            <div class="ship-dot" style="background:#06b6d4"></div>
+            <div>
+              <div class="ship-id">#{{ s.shipment_id }}</div>
+              <div class="ship-name">{{ s.origin|truncate(10,true,'') }} → {{ s.destination|truncate(10,true,'') }}</div>
             </div>
-            {% else %}
-            <div style="font-size:10px;color:var(--color-text-muted);text-align:center;padding:12px 0">None</div>
-            {% endfor %}
           </div>
+          {% else %}
+          <div class="ship-empty">None</div>
+          {% endfor %}
         </div>
 
         <!-- Delivered -->
         <div class="ship-col">
           <div class="ship-col-header" style="background:#10b981">
-            <span>Delivered</span><span class="count">{{ shipment_counts.get('Delivered', 0) }}</span>
+            Delivered
+            <span class="count">{{ shipment_counts.get('Delivered', 0) }}</span>
           </div>
-          <div class="ship-cards">
-            {% for o in recent_orders if o.status == 'Delivered' %}
-            <div class="ship-card-mini">
-              <div class="id">#ORD-{{ o.order_id }}</div>
-              <div class="cust">{{ o.customer_name }}</div>
+          {% for o in recent_orders if o.status == 'Delivered' %}
+          <div class="ship-item">
+            <div class="ship-dot" style="background:#10b981"></div>
+            <div>
+              <div class="ship-id">#{{ o.order_id }}</div>
+              <div class="ship-name">{{ o.customer_name|truncate(14,true,'') }}</div>
             </div>
-            {% else %}
-            <div style="font-size:10px;color:var(--color-text-muted);text-align:center;padding:12px 0">Clear</div>
-            {% endfor %}
           </div>
+          {% else %}
+          <div class="ship-empty">None</div>
+          {% endfor %}
         </div>
 
         <!-- Cancelled -->
         <div class="ship-col">
           <div class="ship-col-header" style="background:#ef4444">
-            <span>Cancelled</span><span class="count">{{ shipment_counts.get('Cancelled', 0) }}</span>
+            Cancelled
+            <span class="count">{{ shipment_counts.get('Cancelled', 0) }}</span>
           </div>
-          <div class="ship-cards">
-            {% for o in recent_orders if o.status == 'Cancelled' %}
-            <div class="ship-card-mini">
-              <div class="id">#ORD-{{ o.order_id }}</div>
-              <div class="cust">{{ o.customer_name }}</div>
+          {% for o in recent_orders if o.status == 'Cancelled' %}
+          <div class="ship-item">
+            <div class="ship-dot" style="background:#ef4444"></div>
+            <div>
+              <div class="ship-id">#{{ o.order_id }}</div>
+              <div class="ship-name">{{ o.customer_name|truncate(14,true,'') }}</div>
             </div>
-            {% else %}
-            <div style="font-size:10px;color:var(--color-text-muted);text-align:center;padding:12px 0">None</div>
-            {% endfor %}
           </div>
+          {% else %}
+          <div class="ship-empty">None</div>
+          {% endfor %}
         </div>
 
       </div>
@@ -421,199 +227,191 @@
   </div>
 
   <!-- Map & Tracking -->
-  <div class="card" style="display:flex;flex-direction:column">
-    <div class="card-header" style="padding:10px 14px;font-size:12.5px">
+  <div class="card">
+    <div class="card-header">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polygon points="3 11 22 2 13 21 11 13 3 11"/>
       </svg>
-      Map &amp; Fleet Tracking
+      Map & Tracking
       <span style="margin-left:auto;font-size:11px;color:var(--color-text-muted)">
-        <span class="live-dot"></span>{{ stats.in_transit }} moving vehicles
+        <span class="live-dot"></span>{{ stats.in_transit }} active
       </span>
     </div>
-    <div class="card-body" style="padding:8px;flex:1">
-      <div id="dash-map" style="height:250px;width:100%;border-radius:6px;border:1px solid var(--color-border)"></div>
+    <div class="card-body" style="padding:10px">
+      <div id="dash-map" style="height:240px;border-radius:8px;border:1px solid var(--color-border)"></div>
     </div>
   </div>
 
 </div>
 
-<!-- ══ ROW 3: 4 CARDS SIDE BY SIDE (Quotes, Compliance, Transport Donut, On-Time Trend) ══ -->
-<div class="dash-row-quad">
+<!-- ══ CHARTS ROW ══ -->
+<div class="dash-row-mid">
 
-  <!-- 1. Quotes Pipeline -->
-  <div class="card">
-    <div class="card-header" style="padding:10px 12px;font-size:12px">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
-      </svg>
-      Quotes Pipeline
+  <!-- Left: Order Status Donut + On-Time Line -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+
+    <div class="card">
+      <div class="card-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+        </svg>
+        Transport Utilization
+        <span style="margin-left:auto" id="lastUpdate" style="font-size:11px;color:var(--color-text-muted)"></span>
+      </div>
+      <div class="card-body" style="padding:12px">
+        <canvas id="statusChart" height="160"></canvas>
+      </div>
     </div>
-    <div class="card-body" style="padding:12px">
-      <div class="funnel-list">
-        {% set funnel_items = [
-          ('Drafted',    stats.pending, 100, '#3b82f6'),
-          ('Dispatched', stats.in_transit, 72, '#06b6d4'),
-          ('Fulfilled',  shipment_counts.get('Delivered',0), 85, '#10b981'),
-          ('Closed',     stats.orders, 95, '#8b5cf6')
+
+    <div class="card">
+      <div class="card-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+        On-Time Performance
+      </div>
+      <div class="card-body" style="padding:12px">
+        <canvas id="perfChart" height="140"></canvas>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Right: Quotes Funnel + Warehouse Bar -->
+  <div style="display:flex;flex-direction:column;gap:16px">
+
+    <div class="card">
+      <div class="card-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+        </svg>
+        Quotes Pipeline
+      </div>
+      <div class="funnel-wrap">
+        {% set funnel = [
+          ('Pending',    stats.pending,    '#f59e0b', 100),
+          ('Processing', shipment_counts.get('Processing',0), '#3b82f6', 75),
+          ('In Transit', stats.in_transit, '#06b6d4', 55),
+          ('Delivered',  shipment_counts.get('Delivered',0),  '#10b981', 35),
+          ('Cancelled',  shipment_counts.get('Cancelled',0),  '#ef4444', 20)
         ] %}
-        {% for name, count, pct, col in funnel_items %}
-        <div class="funnel-item">
-          <span class="funnel-name">{{ name }}</span>
-          <div class="funnel-bar-bg">
-            <div class="funnel-bar-fill" style="width:{{ pct }}%;background:{{ col }}"></div>
+        {% for label, val, color, pct in funnel %}
+        <div class="funnel-row">
+          <div class="funnel-label">{{ label }}</div>
+          <div class="funnel-bar-wrap">
+            <div class="funnel-bar" style="background:{{ color }};width:{{ pct }}%;opacity:.85"></div>
+            <div class="funnel-val">{{ val }}</div>
           </div>
-          <span class="funnel-num">{{ count }}</span>
         </div>
         {% endfor %}
       </div>
     </div>
-  </div>
 
-  <!-- 2. Customs & Compliance -->
-  <div class="card">
-    <div class="card-header" style="padding:10px 12px;font-size:12px">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/>
-      </svg>
-      Customs &amp; Compliance
-    </div>
-    <div class="card-body" style="padding:12px">
-      <div class="compliance-list">
-        <div class="compliance-item">
-          <div class="compliance-dot" style="background:#10b981"></div>
-          <span class="compliance-text">Port Clearances</span>
-          <span class="compliance-status" style="background:rgba(16,185,129,.15);color:#065f46">100% OK</span>
-        </div>
-        <div class="compliance-item">
-          <div class="compliance-dot" style="background:#3b82f6"></div>
-          <span class="compliance-text">Freight Declarations</span>
-          <span class="compliance-status" style="background:rgba(59,130,246,.15);color:#1e40af">Verified</span>
-        </div>
-        <div class="compliance-item">
-          <div class="compliance-dot" style="background:#f59e0b"></div>
-          <span class="compliance-text">Warehouse Audit</span>
-          <span class="compliance-status" style="background:rgba(245,158,11,.15);color:#92400e">In Review</span>
-        </div>
-        <div class="compliance-item">
-          <div class="compliance-dot" style="background:#10b981"></div>
-          <span class="compliance-text">Tax &amp; Duty Invoices</span>
-          <span class="compliance-status" style="background:rgba(16,185,129,.15);color:#065f46">Cleared</span>
-        </div>
+    <div class="card">
+      <div class="card-header">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>
+        </svg>
+        Stock by Warehouse
+      </div>
+      <div class="card-body" style="padding:12px">
+        <canvas id="warehouseChart" height="140"></canvas>
       </div>
     </div>
-  </div>
 
-  <!-- 3. Transport Utilization (Compact Donut) -->
-  <div class="card">
-    <div class="card-header" style="padding:10px 12px;font-size:12px">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
-      </svg>
-      Transport Utilization
-    </div>
-    <div class="card-body" style="padding:8px 12px">
-      <div class="chart-box-compact">
-        <div style="width:115px;height:115px;position:relative">
-          <canvas id="transportDonut"></canvas>
-        </div>
-        <div class="donut-legend">
-          <div class="donut-legend-item"><div class="donut-dot" style="background:#3b82f6"></div><span>Road 52%</span></div>
-          <div class="donut-legend-item"><div class="donut-dot" style="background:#06b6d4"></div><span>Sea 28%</span></div>
-          <div class="donut-legend-item"><div class="donut-dot" style="background:#8b5cf6"></div><span>Air 20%</span></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 4. On-Time Performance (Compact Area Trend) -->
-  <div class="card">
-    <div class="card-header" style="padding:10px 12px;font-size:12px">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-      </svg>
-      On-Time Performance
-      <span style="margin-left:auto;font-size:11px;font-weight:700;color:#10b981">94.8%</span>
-    </div>
-    <div class="card-body" style="padding:8px 12px">
-      <div class="chart-box-compact">
-        <canvas id="onTimeChart"></canvas>
-      </div>
-    </div>
   </div>
 
 </div>
 
-<!-- ══ ROW 4: 3 CARDS (Activities, Integrations, Health) ══ -->
-<div class="dash-row-tri">
+<!-- ══ BOTTOM ROW: Activity + Low Stock + Integration Health ══ -->
+<div class="dash-row-bottom">
 
-  <!-- Activities Feed -->
-  <div class="card">
-    <div class="card-header" style="padding:10px 14px;font-size:12.5px">
+  <!-- Recent Activities -->
+  <div class="card" style="grid-column: span 2">
+    <div class="card-header">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
       </svg>
-      Recent Operations Log
+      Recent Activities
     </div>
     <div class="activity-feed">
-      {% for o in recent_orders[:4] %}
-      <div class="activity-item" style="padding:8px 12px">
+      {% for o in recent_orders %}
+      <div class="activity-item">
         <div class="activity-dot" style="background:{% if o.status=='Delivered' %}#10b981{% elif o.status=='Cancelled' %}#ef4444{% elif o.status=='Pending' %}#f59e0b{% else %}#3b82f6{% endif %}"></div>
-        <div class="activity-text" style="font-size:12px">
-          Order <strong>#{{ o.order_id }}</strong>: {{ o.customer_name }}
-          <span class="badge badge-{{ o.status|lower }}" style="font-size:9.5px;padding:1px 6px">{{ o.status }}</span>
+        <div class="activity-text">
+          Order <span>#{{ o.order_id }}</span> from <span>{{ o.customer_name }}</span>
+          — {{ o.product_name }}
+          <span class="badge badge-{{ o.status|lower }}" style="margin-left:6px;font-size:10px">{{ o.status }}</span>
         </div>
-        <div class="activity-time" style="font-size:10.5px">{{ o.order_date }}</div>
+        <div class="activity-time">Recent</div>
       </div>
       {% else %}
-      <div style="padding:14px;text-align:center;color:var(--color-text-muted);font-size:12px">No recent entries</div>
+      <div style="padding:20px;text-align:center;color:var(--color-text-light);font-size:13px">No recent orders.</div>
       {% endfor %}
     </div>
   </div>
 
-  <!-- Integrations -->
+  <!-- Low Stock -->
   <div class="card">
-    <div class="card-header" style="padding:10px 14px;font-size:12.5px">
+    <div class="card-header" style="color:{% if stats.low_stock > 0 %}#dc2626{% else %}inherit{% endif %}">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-        <rect x="2" y="2" width="20" height="8" rx="2" ry="2"/><rect x="2" y="14" width="20" height="8" rx="2" ry="2"/>
-        <line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
+        <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
       </svg>
-      Connected Services
+      Low Stock Alert
+      {% if stats.low_stock > 0 %}
+        <span class="badge badge-danger" style="margin-left:auto">{{ stats.low_stock }}</span>
+      {% endif %}
     </div>
-    <div class="card-body" style="padding:12px">
-      <div class="partner-grid">
-        <div class="partner-box"><div class="partner-check"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/></svg><span>GPS Fleet</span></div>
-        <div class="partner-box"><div class="partner-check"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg><span>Warehouse</span></div>
-        <div class="partner-box"><div class="partner-check"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/></svg><span>Postgres</span></div>
-        <div class="partner-box"><div class="partner-check"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg><span>AI Engine</span></div>
-        <div class="partner-box"><div class="partner-check"></div><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 2 7 12 12 22 7 12 2"/></svg><span>Webhooks</span></div>
-      </div>
+    <div class="table-wrapper">
+      <table style="font-size:12px">
+        <thead><tr><th>Product</th><th>Warehouse</th><th>Qty</th></tr></thead>
+        <tbody>
+          {% for s in low_stock %}
+          <tr>
+            <td class="fw-600" style="padding:8px 14px">{{ s.product_name }}</td>
+            <td style="padding:8px 14px;color:var(--color-text-muted)">{{ s.warehouse }}</td>
+            <td style="padding:8px 14px"><span class="badge badge-danger">{{ s.quantity }}</span></td>
+          </tr>
+          {% else %}
+          <tr class="empty-row"><td colspan="3">All stock healthy.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
     </div>
   </div>
 
-  <!-- System Health -->
+  <!-- Integration Health -->
   <div class="card">
-    <div class="card-header" style="padding:10px 14px;font-size:12.5px">
+    <div class="card-header">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
       </svg>
       System Health
     </div>
-    <div class="integration-list" style="padding:10px 14px;gap:8px">
-      {% set health_bars = [
-        ('Database Layer', '#10b981', 99),
-        ('Fleet Route Tracker', '#3b82f6', 95),
-        ('Inventory Sync', '#06b6d4', 92),
-        ('Security & Auth', '#8b5cf6', 100)
+    <div class="integration-list">
+      {% set health = [
+        ('Database',  '#10b981', 98),
+        ('Shipments', '#3b82f6', 94),
+        ('Inventory', '#f59e0b', 87),
+        ('Orders',    '#8b5cf6', 92),
+        ('AI Module', '#06b6d4', 85),
       ] %}
-      {% for name, col, pct in health_bars %}
-      <div style="display:flex;flex-direction:column;gap:3px">
-        <div style="display:flex;justify-content:space-between;font-size:11px">
-          <span style="font-weight:600;color:var(--color-text)">{{ name }}</span>
-          <span style="font-weight:700;color:{{ col }}">{{ pct }}%</span>
+      {% for name, color, pct in health %}
+      <div class="integration-item">
+        <div class="integration-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="{{ color }}" stroke-width="2">
+            <circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2"/>
+          </svg>
         </div>
-        <div style="height:5px;background:var(--color-border);border-radius:3px;overflow:hidden">
-          <div style="height:100%;width:{{ pct }}%;background:{{ col }};border-radius:3px"></div>
+        <div class="integration-info">
+          <div class="integration-name">{{ name }}</div>
+          <div class="integration-bar-wrap">
+            <div class="integration-bar">
+              <div class="integration-bar-fill" style="width:{{ pct }}%;background:{{ color }}"></div>
+            </div>
+            <span class="integration-pct">{{ pct }}%</span>
+          </div>
         </div>
       </div>
       {% endfor %}
@@ -622,7 +420,7 @@
 
 </div>
 
-<!-- Scripts -->
+<!-- Map + Charts Scripts -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script src="{{ url_for('static', filename='js/tracking.js') }}"></script>
 <script>SCWMS.initOverview('dash-map', {{ map_data|tojson }});</script>
@@ -630,61 +428,89 @@
 <script>
 (function(){
   const isDark = () => document.documentElement.getAttribute('data-theme') === 'dark';
+  const GRID = () => isDark() ? 'rgba(255,255,255,.07)' : 'rgba(100,116,139,.1)';
+  const TEXT = () => isDark() ? '#94a3b8' : '#64748b';
+
   Chart.defaults.font.family = 'Inter, sans-serif';
+  Chart.defaults.font.size   = 11;
 
-  // 1. Transport Utilization Donut (compact)
-  const ctxDonut = document.getElementById('transportDonut');
-  if (ctxDonut) {
-    new Chart(ctxDonut, {
-      type: 'doughnut',
-      data: {
-        labels: ['Road', 'Sea', 'Air'],
-        datasets: [{
-          data: [52, 28, 20],
-          backgroundColor: ['#3b82f6', '#06b6d4', '#8b5cf6'],
-          borderWidth: 2,
-          borderColor: isDark() ? '#111827' : '#ffffff',
-          hoverOffset: 3
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        cutout: '72%',
-        plugins: { legend: { display: false }, tooltip: { enabled: true } }
+  const SC = {'Pending':'#f59e0b','Processing':'#3b82f6','Shipped':'#06b6d4','Delivered':'#10b981','Cancelled':'#ef4444','In Transit':'#06b6d4'};
+
+  /* Donut */
+  const sDough = new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: { labels:[], datasets:[{ data:[], backgroundColor:[], borderWidth:2, borderColor:'transparent', hoverOffset:4 }] },
+    options: {
+      responsive:true, cutout:'65%',
+      plugins:{ legend:{ position:'bottom', labels:{ padding:10, usePointStyle:true } } }
+    }
+  });
+
+  /* Line — On-Time Performance */
+  const perf = new Chart(document.getElementById('perfChart'), {
+    type:'line',
+    data:{ labels:['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+           datasets:[{ label:'On-Time %', data:[88,92,87,95,91,96,93],
+             borderColor:'#3b82f6', backgroundColor:'rgba(59,130,246,.12)',
+             tension:.4, fill:true, pointRadius:3 }] },
+    options:{ responsive:true,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ grid:{ display:false } },
+        y:{ min:70, max:100, grid:{ color: GRID() }, ticks:{ callback: v => v+'%' } }
       }
-    });
+    }
+  });
+
+  /* Bar — Warehouse */
+  const wBar = new Chart(document.getElementById('warehouseChart'), {
+    type:'bar',
+    data:{ labels:[], datasets:[{
+      label:'Units', data:[],
+      backgroundColor:['#3b82f6','#06b6d4','#8b5cf6','#f59e0b','#10b981'],
+      borderRadius:5, borderSkipped:false
+    }]},
+    options:{
+      responsive:true,
+      plugins:{ legend:{ display:false } },
+      scales:{
+        x:{ grid:{ display:false } },
+        y:{ grid:{ color: GRID() }, beginAtZero:true }
+      }
+    }
+  });
+
+  const kMap = {
+    shipments:'kpi-shipments', in_transit:'kpi-transit',
+    orders:'kpi-orders', low_stock:'kpi-low-stock', suppliers:'kpi-suppliers'
+  };
+
+  function animNum(el, to){
+    const from=parseInt(el.textContent)||0;
+    if(from===to) return;
+    const d=to>from?1:-1, step=Math.max(1,Math.ceil(Math.abs(to-from)/6));
+    let v=from;
+    const t=setInterval(()=>{ v+=d*step; if((d>0&&v>=to)||(d<0&&v<=to)){v=to;clearInterval(t);} el.textContent=v; },40);
   }
 
-  // 2. On-Time Performance Area Trend (compact)
-  const ctxTrend = document.getElementById('onTimeChart');
-  if (ctxTrend) {
-    new Chart(ctxTrend, {
-      type: 'line',
-      data: {
-        labels: ['M', 'T', 'W', 'T', 'F', 'S', 'S'],
-        datasets: [{
-          data: [91, 93, 89, 95, 94, 96, 95],
-          borderColor: '#10b981',
-          backgroundColor: 'rgba(16,185,129,.12)',
-          fill: true,
-          tension: 0.35,
-          pointRadius: 2,
-          pointHoverRadius: 4,
-          borderWidth: 2
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: {
-          x: { grid: { display: false }, ticks: { font: { size: 9 }, color: isDark() ? '#94a3b8' : '#64748b' } },
-          y: { min: 80, max: 100, grid: { color: isDark() ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.04)' }, ticks: { display: false } }
-        }
-      }
-    });
+  function refresh(){
+    fetch('/api/dashboard/live').then(r=>r.json()).then(d=>{
+      if(!d.ok) return;
+      Object.entries(kMap).forEach(([k,id])=>{ const e=document.getElementById(id); if(e) animNum(e,d.stats[k]||0); });
+      sDough.data.labels   = d.status.map(x=>x.s);
+      sDough.data.datasets[0].data            = d.status.map(x=>x.c);
+      sDough.data.datasets[0].backgroundColor = d.status.map(x=>SC[x.s]||'#94a3b8');
+      sDough.update('none');
+      wBar.data.labels = d.wh.map(x=>x.l);
+      wBar.data.datasets[0].data = d.wh.map(x=>x.v);
+      wBar.update('none');
+      const lu=document.getElementById('lastUpdate');
+      if(lu) lu.textContent='Updated '+new Date().toLocaleTimeString();
+    }).catch(()=>{});
   }
+
+  refresh();
+  setInterval(refresh, 30000);
 })();
 </script>
 {% endblock %}
