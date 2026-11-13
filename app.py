@@ -324,8 +324,13 @@ def verify_otp():
                     WHERE LOWER(COALESCE(Email, '')) = LOWER(%s)
                 """, (email,))
 
-                flash('Email verified successfully! You can now sign in.', 'success')
-                return redirect(url_for('login'))
+                session.clear()
+                session['user'] = user['username']
+                session['role'] = user.get('role', 'Admin')
+                session['email'] = user.get('email', '')
+                session.permanent = True
+                flash(f"Account verified! Welcome to your dashboard, {user['username']}.", 'success')
+                return redirect(url_for('dashboard'))
             else:
                 flash('Invalid verification code. Please try again.', 'error')
         except Exception as e:
