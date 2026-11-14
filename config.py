@@ -28,9 +28,9 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
 GROQ_API_KEY   = os.environ.get('GROQ_API_KEY', '').strip()
 AI_PROVIDER    = os.environ.get('AI_PROVIDER', 'auto').strip().lower()
 GEMINI_MODELS  = [m.strip() for m in os.environ.get(
-    'GEMINI_MODELS', 'gemini-3.8-flash,gemini-3.6-flash,gemini-2.5-flash').split(',') if m.strip()]
+    'GEMINI_MODELS', 'gemini-1.5-flash,gemini-1.5-pro,gemini-pro').split(',') if m.strip()]
 GROQ_MODELS    = [m.strip() for m in os.environ.get(
-    'GROQ_MODELS', 'openai/gpt-oss-120b,openai/gpt-oss-20b,qwen/qwen3.6-27b').split(',') if m.strip()]
+    'GROQ_MODELS', 'llama-3.1-70b-versatile,llama-3.1-8b-instant,gemma2-9b-it').split(',') if m.strip()]
 
 
 def _connect(url=None):
